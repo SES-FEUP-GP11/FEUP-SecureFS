@@ -1,4 +1,8 @@
-/* src/index.css */
 @import "tailwindcss";
 
-/* You can add other base styles here if needed */
+/* Add any other global base styles or overrides below */
+body {
+  font-family: 'Inter', sans-serif; /* Example: Setting a default font */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

@@ -44,6 +44,6 @@ export interface SharePermission {
  */
 export interface ApiError {
   message: string; // User-friendly error message
-  detail?: string | Record<string, any>; // More specific details (optional)
+  detail?: string | Record<string, unknown>; // More specific details (optional)
   statusCode?: number; // HTTP status code (optional)
 }
