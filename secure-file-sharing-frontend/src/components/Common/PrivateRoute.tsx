@@ -1,42 +1,45 @@
 // src/components/Common/PrivateRoute.tsx
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth'; // Import the custom hook
+import React from "react";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
 
-interface PrivateRouteProps {
-  children: React.ReactNode; // The component/elements to render if authenticated
-}
+const PrivateRoute: React.FC = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
 
-/**
- * A component that wraps routes requiring authentication.
- * It checks the authentication status from AuthContext.
- * If authenticated, it renders the child components.
- * If not authenticated, it redirects the user to the login page,
- * preserving the intended destination path.
- * It also handles the initial loading state of the auth check.
- */
-const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth(); // Get auth state and loading status
-  const location = useLocation(); // Get current location to redirect back after login
+  // ---------- DEBUG LOGS ----------
+  console.log("[PrivateRoute] Status Check:", {
+    isLoading,
+    isAuthenticated,
+    path: location.pathname,
+  });
+  // ---------------------------------
 
-  // While checking auth status, show a loading indicator (optional)
+  /* 1. While we’re still checking the token, show a splash */
   if (isLoading) {
-    // You can replace this with a more sophisticated loading spinner/component
+    console.log("[PrivateRoute] Rendering Loading Indicator");
     return (
       <div className="flex justify-center items-center h-screen">
-        <p>Loading authentication...</p>
+        <p>Checking session…</p>
       </div>
     );
   }
 
-  // If authenticated, render the requested child component/route
-  if (isAuthenticated) {
-    return <>{children}</>; // Render the children passed to PrivateRoute
+  /* 2. If the user isn’t logged in, bounce them to /login */
+  if (!isAuthenticated) {
+    console.log(
+      "[PrivateRoute] Redirecting to Login from path:",
+      location.pathname
+    );
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // If not authenticated and not loading, redirect to login page
-  // Pass the current location state so we can redirect back after login
-  return <Navigate to="/login" state={{ from: location }} replace />;
+  /* 3. User is authenticated → render the branch below this route */
+  console.log(
+    "[PrivateRoute] Authenticated, rendering outlet for path:",
+    location.pathname
+  );
+  return <Outlet />;
 };
 
 export default PrivateRoute;

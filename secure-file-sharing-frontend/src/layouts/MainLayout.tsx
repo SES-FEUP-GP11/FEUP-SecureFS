@@ -1,42 +1,152 @@
+// // src/layouts/MainLayout.tsx
+
+// import React from "react"; // No need for PropsWithChildren if using implicit children with React.FC
+// import { Outlet, Link } from "react-router-dom";
+// import { useAuth } from "../hooks/useAuth";
+// import { LogOut, Files, Share2, Settings } from "lucide-react";
+
+// /**
+//  * Main application layout wrapper.
+//  * Includes Navbar, Sidebar, and renders the main page content via Outlet.
+//  * Displays user information and provides a logout button.
+//  *
+//  * NOTE: React.FC implicitly includes 'children' in its props definition,
+//  * so explicitly adding React.PropsWithChildren or { children: React.ReactNode }
+//  * is often redundant unless you need other specific props.
+//  * The error likely stemmed from a previous definition or a configuration issue.
+//  * Let's ensure the standard React.FC usage is clean.
+//  */
+// const MainLayout: React.FC = () => {
+//   // Using React.FC implicitly handles children
+//   const { user, logout, isLoading: isAuthLoading } = useAuth();
+
+//   const handleLogout = async () => {
+//     try {
+//       await logout();
+//       console.log("MainLayout: Logout initiated successfully.");
+//     } catch (error) {
+//       console.error("MainLayout: Error during logout:", error);
+//     }
+//   };
+
+//   // --- ADD THIS LOG ---
+//   console.log("[MainLayout] Rendering component...");
+//   // --- END LOG ---
+
+//   return (
+//     <div className="flex h-screen bg-gray-100 font-sans">
+//       {/* Sidebar */}
+//       <div className="w-64 bg-white shadow-lg hidden md:flex md:flex-col">
+//         <div className="p-5 border-b h-16 flex items-center">
+//           <h2 className="text-xl font-bold text-gray-800">FEUP SecureFS</h2>
+//         </div>
+//         <nav className="mt-5 flex-1 px-2 space-y-1">
+//           <Link
+//             to="/files"
+//             className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-indigo-700 hover:bg-indigo-50"
+//           >
+//             <Files className="mr-3 h-5 w-5 text-gray-500 group-hover:text-indigo-600" />
+//             My Files
+//           </Link>
+//           <Link
+//             to="/shared"
+//             className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-indigo-700 hover:bg-indigo-50"
+//           >
+//             <Share2 className="mr-3 h-5 w-5 text-gray-500 group-hover:text-indigo-600" />
+//             Shared with me
+//           </Link>
+//           <Link
+//             to="/settings"
+//             className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-indigo-700 hover:bg-indigo-50"
+//           >
+//             <Settings className="mr-3 h-5 w-5 text-gray-500 group-hover:text-indigo-600" />
+//             Settings
+//           </Link>
+//         </nav>
+//       </div>
+
+//       {/* Main Content Area */}
+//       <div className="flex-1 flex flex-col overflow-hidden">
+//         {/* Navbar */}
+//         <header className="bg-white shadow-sm border-b z-10">
+//           <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+//             <div>
+//               <span className="text-gray-600"></span>
+//             </div>
+//             <div className="flex items-center space-x-4">
+//               {isAuthLoading ? (
+//                 <span className="text-sm text-gray-500">Loading...</span>
+//               ) : user ? (
+//                 <>
+//                   <span className="text-sm font-medium text-gray-700 hidden sm:block">
+//                     Welcome, {user.username}!
+//                   </span>
+//                   <button
+//                     onClick={handleLogout}
+//                     disabled={isAuthLoading}
+//                     className="flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+//                   >
+//                     <LogOut className="h-5 w-5 mr-1 text-gray-500" />
+//                     Logout
+//                   </button>
+//                 </>
+//               ) : (
+//                 <span className="text-sm text-red-500">Not logged in</span>
+//               )}
+//             </div>
+//           </div>
+//         </header>
+
+//         {/* Page Content */}
+//         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
+//           <Outlet /> {/* Child routes render here */}
+//         </main>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default MainLayout;
+
 // src/layouts/MainLayout.tsx
 
-import React from 'react';
-import { Outlet, Link } from 'react-router-dom'; // Import Link for navigation
-import { useAuth } from '../hooks/useAuth'; // Import useAuth hook
-import { LogOut, Files, Share2, Settings, Home } from 'lucide-react'; // Import icons
+import React, { ReactNode } from "react"; // Import ReactNode
+import { Outlet, Link } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { LogOut, Files, Share2, Settings } from "lucide-react"; // Removed Home as it wasn't used
+
+// Define props interface explicitly including children
+interface MainLayoutProps {
+  children?: ReactNode; // Explicitly define children prop
+}
 
 /**
  * Main application layout wrapper.
- * Includes Navbar, Sidebar, and renders the main page content via Outlet.
- * Displays user information and provides a logout button.
+ * Explicitly defines props to accept children for clarity with TypeScript.
  */
-const MainLayout: React.FC = () => {
-  const { user, logout, isLoading: isAuthLoading } = useAuth(); // Get user and logout function
+const MainLayout: React.FC<MainLayoutProps> = (props) => {
+  // Use the props interface
+  const { user, logout, isLoading: isAuthLoading } = useAuth();
 
-  // Handle logout click
   const handleLogout = async () => {
     try {
       await logout();
-      // No need to navigate here, PrivateRoute will handle redirection
-      console.log('MainLayout: Logout initiated successfully.');
+      console.log("MainLayout: Logout initiated successfully.");
     } catch (error) {
-      console.error('MainLayout: Error during logout:', error);
-      // Maybe show an error notification to the user
+      console.error("MainLayout: Error during logout:", error);
     }
   };
 
+  console.log("[MainLayout] Rendering component...");
+
   return (
-    <div className="flex h-screen bg-gray-100 font-sans"> {/* Changed font */}
+    <div className="flex h-screen bg-gray-100 font-sans">
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg hidden md:flex md:flex-col"> {/* Ensure flex column */}
-        {/* Logo/Brand */}
+      <div className="w-64 bg-white shadow-lg hidden md:flex md:flex-col">
         <div className="p-5 border-b h-16 flex items-center">
-          {/* Placeholder for a logo icon */}
-          {/* <Home className="h-6 w-6 mr-2 text-indigo-600" />  */}
           <h2 className="text-xl font-bold text-gray-800">FEUP SecureFS</h2>
         </div>
-        {/* Navigation */}
-        <nav className="mt-5 flex-1 px-2 space-y-1"> {/* flex-1 to take remaining space */}
+        <nav className="mt-5 flex-1 px-2 space-y-1">
           <Link
             to="/files"
             className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-indigo-700 hover:bg-indigo-50"
@@ -66,7 +176,7 @@ const MainLayout: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Navbar */}
-        <header className="bg-white shadow-sm border-b z-10"> {/* Added z-index */}
+        <header className="bg-white shadow-sm border-b z-10">
           <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             {/* Left side - Placeholder for search or breadcrumbs */}
             <div>
@@ -80,7 +190,9 @@ const MainLayout: React.FC = () => {
                 <span className="text-sm text-gray-500">Loading...</span>
               ) : user ? (
                 <>
-                  <span className="text-sm font-medium text-gray-700 hidden sm:block"> {/* Hide on small screens */}
+                  <span className="text-sm font-medium text-gray-700 hidden sm:block">
+                    {" "}
+                    {/* Hide on small screens */}
                     Welcome, {user.username}!
                   </span>
                   <button
@@ -102,7 +214,11 @@ const MainLayout: React.FC = () => {
 
         {/* Page Content */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
-          <Outlet /> {/* Child routes render here */}
+          {console.log("[MainLayout] Rendering Outlet...")}
+          {/* Outlet renders the matched nested route component */}
+          <Outlet />
+          {/* We pass the actual children via the element prop in App.tsx's Route definition */}
+          {/* Using props.children here would render direct children, which isn't how Outlet works */}
         </main>
       </div>
     </div>
