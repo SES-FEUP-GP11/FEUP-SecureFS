@@ -1,22 +1,21 @@
-// src/services/fileService.ts
 import type { FileNode, ApiError } from "../types";
-import apiClient from "./apiClient"; // Import the actual API client
+import apiClient from "./apiClient";
 
 // --- Mock File System Data (FOR SIMULATION ONLY) ---
 // This data will be replaced by actual backend responses.
 const mockFileSystem: Record<string, FileNode[]> = {
   "/": [
     {
-      id: "sim-folder-1",
-      name: "Documents",
+      id: "sim-folder-docs",
+      name: "Docs",
       is_directory: true,
-      path: "/Documents",
+      path: "/Docs",
       owner_username: "testuser",
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      updated_at: new Date(Date.now() - 86400000).toISOString(),
+      created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+      updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
     },
     {
-      id: "sim-folder-2",
+      id: "sim-folder-pics",
       name: "Pictures",
       is_directory: true,
       path: "/Pictures",
@@ -25,7 +24,7 @@ const mockFileSystem: Record<string, FileNode[]> = {
       updated_at: new Date(Date.now() - 172800000).toISOString(),
     },
     {
-      id: "sim-file-1",
+      id: "sim-file-report",
       name: "report.txt",
       is_directory: false,
       path: "/report.txt",
@@ -36,12 +35,12 @@ const mockFileSystem: Record<string, FileNode[]> = {
       updated_at: new Date().toISOString(),
     },
   ],
-  "/Documents": [
+  "/Docs": [
     {
-      id: "sim-file-2",
+      id: "sim-file-plan",
       name: "project_plan.docx",
       is_directory: false,
-      path: "/Documents/project_plan.docx",
+      path: "/Docs/project_plan.docx",
       size: 51200,
       mime_type:
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -50,10 +49,32 @@ const mockFileSystem: Record<string, FileNode[]> = {
       updated_at: new Date().toISOString(),
     },
     {
-      id: "sim-folder-3",
+      id: "sim-folder-archive",
       name: "Archive",
       is_directory: true,
-      path: "/Documents/Archive",
+      path: "/Docs/Archive",
+      owner_username: "testuser",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: "sim-folder-test",
+      name: "Test",
+      is_directory: true,
+      path: "/Docs/Test",
+      owner_username: "testuser",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  ],
+  "/Docs/Test": [
+    {
+      id: "sim-file-subtest",
+      name: "subtest.txt",
+      is_directory: false,
+      path: "/Docs/Test/subtest.txt",
+      size: 50,
+      mime_type: "text/plain",
       owner_username: "testuser",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -61,7 +82,7 @@ const mockFileSystem: Record<string, FileNode[]> = {
   ],
   "/Pictures": [
     {
-      id: "sim-file-3",
+      id: "sim-file-vacation",
       name: "vacation.jpg",
       is_directory: false,
       path: "/Pictures/vacation.jpg",
@@ -72,25 +93,46 @@ const mockFileSystem: Record<string, FileNode[]> = {
       updated_at: new Date().toISOString(),
     },
   ],
-  "/Documents/Archive": [], // Empty directory
+  "/Docs/Archive": [], // Empty directory
 };
 // --- END SIMULATION DATA ---
 
-/**
- * Fetches the list of files and folders for a given path from the backend.
- *
- * **Integration Notes:**
- * - **Backend Endpoint:** GET /api/files/
- * - **Request Parameters:** Expects a 'path' query parameter (e.g., /api/files/?path=/Documents).
- * - **Authentication:** Requires user to be authenticated (handled by apiClient interceptor later).
- * - **Success Response:** 200 OK with JSON body: `FileNode[]`
- * - **Error Responses:** 404 Not Found, 401 Unauthorized, 403 Forbidden, 500 Internal Server Error.
- *
- * @param path - The directory path to list (e.g., '/', '/Documents').
- * @returns A Promise resolving with an array of FileNode objects or rejecting with an ApiError.
- */
+// Helper function for renameNode simulation to recursively update paths
+const recursivelyUpdatePathsAndMoveChildren = (
+  oldDirKey: string,
+  newDirKey: string
+) => {
+  if (!mockFileSystem.hasOwnProperty(oldDirKey)) {
+    return; // Source directory doesn't exist in mock, nothing to do
+  }
+
+  const childrenToMove = mockFileSystem[oldDirKey]!;
+  delete mockFileSystem[oldDirKey]; // Remove old directory entry
+
+  mockFileSystem[newDirKey] = []; // Create new directory entry
+
+  for (const child of childrenToMove) {
+    const oldChildPath = child.path;
+    // Replace only the beginning of the path that matches oldDirKey
+    const newChildPath = oldChildPath.startsWith(oldDirKey + "/")
+      ? newDirKey + oldChildPath.substring(oldDirKey.length)
+      : newDirKey + "/" + child.name; // Fallback for direct children if path was just oldDirKey
+
+    const updatedChild = { ...child, path: newChildPath };
+    mockFileSystem[newDirKey].push(updatedChild);
+
+    if (updatedChild.is_directory) {
+      // Recursively call for subdirectories, using their original old path and new path
+      recursivelyUpdatePathsAndMoveChildren(oldChildPath, newChildPath);
+    }
+  }
+  console.log(
+    `[SIMULATION Helper] Moved children from ${oldDirKey} to ${newDirKey} and updated paths.`
+  );
+};
+
 export const listFiles = async (path: string): Promise<FileNode[]> => {
-  // --- SIMULATION CODE START ---
+  // ... (listFiles implementation remains the same)
   console.log(`[SIMULATION] listFiles for path: ${path}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -112,52 +154,16 @@ export const listFiles = async (path: string): Promise<FileNode[]> => {
         );
         reject(error);
       }
-    }, 800);
+    }, 300); // Reduced delay for faster testing
   });
-  // --- SIMULATION CODE END ---
-
-  // --- REAL API CALL (Replace simulation block with this) ---
-  /*
-  try {
-    console.log(`[API] Fetching files for path: ${path}`);
-    const response = await apiClient.get<FileNode[]>('/files/', {
-      params: { path: path || '/' }
-    });
-    console.log(`[API] Files fetched successfully for ${path}:`, response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error(`[API] Error fetching files for ${path}:`, error);
-    const apiError: ApiError = {
-      message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to fetch files',
-      statusCode: error.response?.status,
-      detail: error.response?.data
-    };
-    throw apiError;
-  }
-  */
-  // --- END REAL API CALL ---
 };
 
-/**
- * Creates a new folder at the specified path.
- *
- * **Integration Notes:**
- * - **Backend Endpoint:** POST /api/files/mkdir/
- * - **Request Body:** JSON `{ "path": "/path/to/new_folder" }`
- * - **Authentication:** Required.
- * - **Success Response:** 201 Created with JSON body: `FileNode`.
- * - **Error Responses:** 400, 409, 401/403, 500.
- *
- * @param parentPath - The path of the parent directory.
- * @param name - The name of the new folder.
- * @returns A Promise resolving with the created FileNode or rejecting with an ApiError.
- */
 export const createFolder = async (
   parentPath: string,
   name: string
 ): Promise<FileNode> => {
+  // ... (createFolder implementation remains the same)
   const fullPath = `${parentPath === "/" ? "" : parentPath}/${name}`;
-  // --- SIMULATION CODE START ---
   console.log(`[SIMULATION] createFolder: ${fullPath}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -168,7 +174,6 @@ export const createFolder = async (
         });
         return;
       }
-      // Simulate check if folder already exists in parent
       if (
         mockFileSystem[parentPath]?.some(
           (node) => node.name === name && node.is_directory
@@ -177,7 +182,6 @@ export const createFolder = async (
         reject({ message: `Folder already exists: ${name}`, statusCode: 409 });
         return;
       }
-
       const newFolder: FileNode = {
         id: `sim-folder-${Date.now()}`,
         name: name,
@@ -188,47 +192,15 @@ export const createFolder = async (
         updated_at: new Date().toISOString(),
       };
       mockFileSystem[parentPath]?.push(newFolder);
-      mockFileSystem[fullPath] = []; // Create entry for the new folder
+      mockFileSystem[fullPath] = [];
       console.log("[SIMULATION] createFolder successful:", newFolder);
       resolve(newFolder);
-    }, 500);
+    }, 300);
   });
-  // --- SIMULATION CODE END ---
-
-  // --- REAL API CALL ---
-  /*
-  try {
-    console.log(`[API] Creating folder: ${fullPath}`);
-    const response = await apiClient.post<FileNode>('/files/mkdir/', { path: fullPath });
-    console.log('[API] Folder created successfully:', response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error(`[API] Error creating folder ${fullPath}:`, error);
-    const apiError: ApiError = {
-      message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to create folder',
-      statusCode: error.response?.status, detail: error.response?.data
-    };
-    throw apiError;
-  }
-  */
-  // --- END REAL API CALL ---
 };
 
-/**
- * Deletes a file or folder at the specified path.
- *
- * **Integration Notes:**
- * - **Backend Endpoint:** DELETE /api/files/
- * - **Request Body:** JSON `{ "path": "/path/to/delete" }`
- * - **Authentication:** Required.
- * - **Success Response:** 204 No Content.
- * - **Error Responses:** 404, 400, 401/403, 500.
- *
- * @param nodePath - The full path of the file or folder to delete.
- * @returns A Promise resolving on success or rejecting with an ApiError.
- */
 export const deleteNode = async (nodePath: string): Promise<void> => {
-  // --- SIMULATION CODE START ---
+  // ... (deleteNode implementation remains the same)
   console.log(`[SIMULATION] deleteNode: ${nodePath}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -242,7 +214,6 @@ export const deleteNode = async (nodePath: string): Promise<void> => {
         reject({ message: `Node not found: ${nodePath}`, statusCode: 404 });
         return;
       }
-
       if (mockFileSystem[parentPath]) {
         mockFileSystem[parentPath] =
           mockFileSystem[parentPath]?.filter(
@@ -250,43 +221,20 @@ export const deleteNode = async (nodePath: string): Promise<void> => {
           ) ?? [];
       }
       if (mockFileSystem.hasOwnProperty(nodePath)) {
-        // Basic simulation: If it's a directory, just delete its entry.
-        // A real backend would handle recursive deletion.
+        // For simulation, if it's a directory, we also need to remove its children's entries if they were flat
+        // This simple delete won't handle deep recursive deletes of mockFileSystem keys.
         delete mockFileSystem[nodePath];
       }
       console.log("[SIMULATION] deleteNode successful.");
       resolve();
-    }, 500);
+    }, 300);
   });
-  // --- SIMULATION CODE END ---
-
-  // --- REAL API CALL ---
-  /*
-  try {
-    console.log(`[API] Deleting node: ${nodePath}`);
-    await apiClient.delete('/files/', { data: { path: nodePath } });
-    console.log('[API] Node deleted successfully.');
-  } catch (error: any) {
-    console.error(`[API] Error deleting node ${nodePath}:`, error);
-    const apiError: ApiError = {
-      message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to delete item',
-      statusCode: error.response?.status, detail: error.response?.data
-    };
-    throw apiError;
-  }
-  */
-  // --- END REAL API CALL ---
 };
 
 /**
  * Renames a file or folder.
  *
- * **Integration Notes:**
- * - **Backend Endpoint:** PATCH /api/files/rename/ (or PUT)
- * - **Request Body:** JSON `{ "path": "/path/to/old_item", "new_name": "new_item_name" }`
- * - **Authentication:** Required.
- * - **Success Response:** 200 OK with JSON body: `FileNode`.
- * - **Error Responses:** 404, 400, 409, 401/403, 500.
+ * **Integration Notes:** (comments remain the same)
  *
  * @param oldPath - The current full path of the item.
  * @param newName - The desired new name (not the full path).
@@ -296,8 +244,9 @@ export const renameNode = async (
   oldPath: string,
   newName: string
 ): Promise<FileNode> => {
-  // --- SIMULATION CODE START ---
-  console.log(`[SIMULATION] renameNode: ${oldPath} to ${newName}`);
+  console.log(
+    `[SIMULATION] renameNode: from "${oldPath}" to new name "${newName}"`
+  );
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "/";
@@ -310,50 +259,57 @@ export const renameNode = async (
         nodeIndex === -1 ||
         !mockFileSystem[parentPath]
       ) {
+        console.error(
+          `[SIMULATION] renameNode: Node not found in parent list: ${oldPath}`
+        );
         reject({ message: `Node not found: ${oldPath}`, statusCode: 404 });
         return;
       }
 
-      const newPath = `${parentPath === "/" ? "" : parentPath}/${newName}`;
-      // Simulate check if name already exists in parent
-      if (mockFileSystem[parentPath]?.some((node) => node.path === newPath)) {
-        reject({ message: `Name already exists: ${newName}`, statusCode: 409 });
+      const itemToUpdate = mockFileSystem[parentPath]![nodeIndex]!;
+      const newFullPath = `${parentPath === "/" ? "" : parentPath}/${newName}`;
+
+      // Check for name conflict in the same directory
+      if (
+        mockFileSystem[parentPath]!.some(
+          (node) => node.name === newName && node.path !== oldPath
+        )
+      ) {
+        console.error(
+          `[SIMULATION] renameNode: Name conflict for "${newName}" in "${parentPath}"`
+        );
+        reject({
+          message: `An item named "${newName}" already exists in this location.`,
+          statusCode: 409,
+        });
         return;
       }
 
-      const nodeToUpdate = mockFileSystem[parentPath]![nodeIndex]!;
-      nodeToUpdate.name = newName;
-      nodeToUpdate.path = newPath;
-      nodeToUpdate.updated_at = new Date().toISOString();
-
-      if (nodeToUpdate.is_directory && mockFileSystem.hasOwnProperty(oldPath)) {
-        mockFileSystem[newPath] = mockFileSystem[oldPath]!;
-        delete mockFileSystem[oldPath];
-        // TODO: Simulate recursive path updates for children (complex)
-      }
-      console.log("[SIMULATION] renameNode successful:", nodeToUpdate);
-      resolve(nodeToUpdate);
-    }, 500);
-  });
-  // --- SIMULATION CODE END ---
-
-  // --- REAL API CALL ---
-  /*
-    try {
-      console.log(`[API] Renaming node: ${oldPath} to ${newName}`);
-      const response = await apiClient.patch<FileNode>('/files/rename/', { path: oldPath, new_name: newName });
-      console.log('[API] Node renamed successfully:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error(`[API] Error renaming node ${oldPath}:`, error);
-      const apiError: ApiError = {
-        message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to rename item',
-        statusCode: error.response?.status, detail: error.response?.data
+      // Update the item in its parent's list
+      const updatedItemInParentList: FileNode = {
+        ...itemToUpdate,
+        name: newName,
+        path: newFullPath,
+        updated_at: new Date().toISOString(),
       };
-      throw apiError;
-    }
-    */
-  // --- END REAL API CALL ---
-};
+      mockFileSystem[parentPath]![nodeIndex] = updatedItemInParentList;
+      console.log(
+        `[SIMULATION] renameNode: Updated item in parent list. New path: ${newFullPath}`
+      );
 
-// Add other simulated functions (upload, download, share, etc.) later...
+      // If it was a directory, handle its children and its own entry in mockFileSystem
+      if (itemToUpdate.is_directory) {
+        console.log(
+          `[SIMULATION] renameNode: Item is a directory. Old key: ${oldPath}, New key: ${newFullPath}`
+        );
+        recursivelyUpdatePathsAndMoveChildren(oldPath, newFullPath);
+      }
+
+      console.log(
+        "[SIMULATION] renameNode successful, returning:",
+        updatedItemInParentList
+      );
+      resolve(updatedItemInParentList); // Return the updated node as it appears in its parent's list
+    }, 300);
+  });
+};
