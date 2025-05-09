@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom"; // Import necessary hooks
+import { useParams, useNavigate } from "react-router-dom";
 import type { FileNode, ApiError } from "../types";
 import { listFiles } from "../services/fileService";
 import { Folder, File as FileIcon, AlertCircle, Loader2 } from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
 
 /**
  * Page component for browsing files and folders.
@@ -11,31 +12,33 @@ import { Folder, File as FileIcon, AlertCircle, Loader2 } from "lucide-react";
  */
 const FilesPage: React.FC = () => {
   const navigate = useNavigate();
-  const params = useParams(); // Use useParams to get the splat (*) parameter
+  const params = useParams();
+  const { isAuthenticated } = useAuth();
 
-  // Extract the path from the splat parameter, default to '/'
-  // The '*' in the route path captures everything after '/files/'
-  const currentDirectoryPath = `/${params["*"] || ""}`;
+  // The '*' in the route path captures everything after '/files'
+  // params['*'] might be 'Documents' or 'Documents/Archive' or undefined for root
+  const splatPath = params["*"] || "";
+  // currentDirectoryPath should represent the logical path from the user's root, e.g., '/', '/Documents', '/Documents/Archive'
+  const currentDirectoryPath = `/${splatPath}`;
 
   const [files, setFiles] = useState<FileNode[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<ApiError | null>(null);
 
-  // Effect to fetch files when the component mounts or path changes
   useEffect(() => {
     const fetchFiles = async () => {
-      // Normalize path: remove trailing slash unless it's the root '/'
-      let path = currentDirectoryPath;
-      if (path !== "/" && path.endsWith("/")) {
-        path = path.slice(0, -1);
+      // Normalize path for the listFiles service: remove trailing slash unless it's the root '/'
+      let servicePath = currentDirectoryPath;
+      if (servicePath !== "/" && servicePath.endsWith("/")) {
+        servicePath = servicePath.slice(0, -1);
       }
-      console.log(`FilesPage: Fetching files for path: ${path}`);
+      console.log(`FilesPage: Fetching files for servicePath: ${servicePath}`);
       setIsLoading(true);
       setError(null);
       setFiles([]);
 
       try {
-        const fetchedFiles = await listFiles(path); // Use the normalized path
+        const fetchedFiles = await listFiles(servicePath);
         setFiles(fetchedFiles);
         console.log("FilesPage: Files fetched successfully");
       } catch (err) {
@@ -49,29 +52,22 @@ const FilesPage: React.FC = () => {
     fetchFiles();
   }, [currentDirectoryPath]); // Re-run effect if the captured path changes
 
-  /**
-   * Handles clicks on file/folder list items.
-   * Navigates into directories or logs clicks on files.
-   * @param item - The FileNode that was clicked.
-   */
   const handleItemClick = (item: FileNode) => {
     if (item.is_directory) {
-      // Navigate to the new path, ensuring no double slashes
-      // Remove leading slash from item.path if current path is root
-      const pathSegment = item.path.startsWith("/")
-        ? item.path.substring(1)
-        : item.path;
-      const navigateTo = `/files${pathSegment}`; // Construct the full browser path
-      console.log(`FilesPage: Navigating to directory: ${navigateTo}`);
+      // item.path from simulation is the full logical path (e.g., "/Documents", "/Documents/Archive")
+      // We want the browser URL to be /files/Documents or /files/Documents/Archive
+      // The leading '/' in item.path is correct here.
+      const navigateTo = `/files${item.path}`; // Corrected: use item.path directly
+
+      console.log(
+        `FilesPage: Attempting navigation to ${navigateTo}. Current auth state: ${isAuthenticated}`
+      );
       navigate(navigateTo);
     } else {
-      // Handle file click (e.g., open preview, download)
       console.log(`FilesPage: Clicked on file: ${item.path}`);
       // TODO: Implement file preview or download logic later
     }
   };
-
-  // --- Render Logic --- (Mostly unchanged, added onClick)
 
   const formatFileSize = (sizeInBytes: number): string => {
     if (sizeInBytes < 1024) return `${sizeInBytes} B`;
@@ -115,10 +111,7 @@ const FilesPage: React.FC = () => {
         </h1>
         {/* TODO: Add Breadcrumbs component here later */}
       </div>
-
-      {/* TODO: Add Action buttons (Upload, Create Folder) section here later */}
-      <div className="mb-4"></div>
-
+      <div className="mb-4"></div> {/* Placeholder for action buttons */}
       {files.length === 0 ? (
         <div className="text-center py-10">
           <Folder className="mx-auto h-12 w-12 text-gray-400" />
@@ -131,8 +124,8 @@ const FilesPage: React.FC = () => {
           {files.map((file) => (
             <li
               key={file.id}
-              className="flex items-center justify-between px-2 py-3 hover:bg-gray-100 rounded-md cursor-pointer transition-colors duration-150" // Added hover bg
-              onClick={() => handleItemClick(file)} // Added onClick handler
+              className="flex items-center justify-between px-2 py-3 hover:bg-gray-100 rounded-md cursor-pointer transition-colors duration-150"
+              onClick={() => handleItemClick(file)}
             >
               <div className="flex items-center min-w-0 flex-1 mr-4">
                 {file.is_directory ? (
@@ -144,7 +137,6 @@ const FilesPage: React.FC = () => {
                   {file.name}
                 </span>
               </div>
-
               <div className="flex items-center space-x-4 flex-shrink-0">
                 {!file.is_directory && file.size !== undefined && (
                   <span className="text-xs text-gray-500 hidden md:block">
@@ -154,10 +146,7 @@ const FilesPage: React.FC = () => {
                 <span className="text-xs text-gray-500 hidden sm:block">
                   {new Date(file.updated_at).toLocaleDateString()}
                 </span>
-                {/* TODO: Add actions menu (Rename, Delete, Share...) later */}
                 <button className="p-1 text-gray-400 hover:text-gray-600 opacity-50 cursor-not-allowed">
-                  {" "}
-                  {/* Placeholder actions */}
                   <span className="text-xs">...</span>
                 </button>
               </div>
@@ -168,4 +157,5 @@ const FilesPage: React.FC = () => {
     </div>
   );
 };
+
 export default FilesPage;
