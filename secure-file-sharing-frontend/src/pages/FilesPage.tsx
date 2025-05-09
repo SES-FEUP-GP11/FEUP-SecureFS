@@ -1,24 +1,25 @@
+// Ensure this file is updated to integrate the Breadcrumbs component
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import type { FileNode, ApiError } from "../types";
 import { listFiles } from "../services/fileService";
 import { Folder, File as FileIcon, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import Breadcrumbs from "../components/Files/Breadcrumbs"; // Import the Breadcrumbs component
 
 /**
  * Page component for browsing files and folders.
  * Fetches and displays the contents of the current directory path from the URL.
- * Handles navigation into subfolders.
+ * Handles navigation into subfolders and displays breadcrumbs.
  */
 const FilesPage: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth(); // Though not directly used in rendering here, good to have for debug
 
-  // The '*' in the route path captures everything after '/files'
-  // params['*'] might be 'Documents' or 'Documents/Archive' or undefined for root
   const splatPath = params["*"] || "";
-  // currentDirectoryPath should represent the logical path from the user's root, e.g., '/', '/Documents', '/Documents/Archive'
+  // currentDirectoryPath is the logical path from the user's file system root, e.g., "/", "/Documents"
   const currentDirectoryPath = `/${splatPath}`;
 
   const [files, setFiles] = useState<FileNode[]>([]);
@@ -27,7 +28,6 @@ const FilesPage: React.FC = () => {
 
   useEffect(() => {
     const fetchFiles = async () => {
-      // Normalize path for the listFiles service: remove trailing slash unless it's the root '/'
       let servicePath = currentDirectoryPath;
       if (servicePath !== "/" && servicePath.endsWith("/")) {
         servicePath = servicePath.slice(0, -1);
@@ -50,22 +50,19 @@ const FilesPage: React.FC = () => {
     };
 
     fetchFiles();
-  }, [currentDirectoryPath]); // Re-run effect if the captured path changes
+  }, [currentDirectoryPath]);
 
   const handleItemClick = (item: FileNode) => {
     if (item.is_directory) {
-      // item.path from simulation is the full logical path (e.g., "/Documents", "/Documents/Archive")
-      // We want the browser URL to be /files/Documents or /files/Documents/Archive
-      // The leading '/' in item.path is correct here.
-      const navigateTo = `/files${item.path}`; // Corrected: use item.path directly
-
+      // item.path from simulation is the full logical path (e.g., "/Documents")
+      // Construct the full browser URL: /files/Documents
+      const navigateTo = `/files${item.path}`;
       console.log(
         `FilesPage: Attempting navigation to ${navigateTo}. Current auth state: ${isAuthenticated}`
       );
       navigate(navigateTo);
     } else {
       console.log(`FilesPage: Clicked on file: ${item.path}`);
-      // TODO: Implement file preview or download logic later
     }
   };
 
@@ -103,13 +100,16 @@ const FilesPage: React.FC = () => {
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <div className="mb-4 pb-4 border-b border-gray-200">
-        <h1 className="text-xl md:text-2xl font-semibold text-gray-800">
-          Current Folder:{" "}
+        {/* Integrate Breadcrumbs component */}
+        <Breadcrumbs currentPath={currentDirectoryPath} />
+        <h1 className="text-xl md:text-2xl font-semibold text-gray-800 mt-2">
+          {" "}
+          {/* Added margin top */}
+          Contents of:{" "}
           <span className="font-mono text-indigo-700">
-            {currentDirectoryPath}
+            {currentDirectoryPath === "/" ? "Root" : currentDirectoryPath}
           </span>
         </h1>
-        {/* TODO: Add Breadcrumbs component here later */}
       </div>
       <div className="mb-4"></div> {/* Placeholder for action buttons */}
       {files.length === 0 ? (
