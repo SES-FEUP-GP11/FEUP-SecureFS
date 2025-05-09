@@ -84,18 +84,13 @@ const mockFileSystem: Record<string, FileNode[]> = {
  * - **Request Parameters:** Expects a 'path' query parameter (e.g., /api/files/?path=/Documents).
  * - **Authentication:** Requires user to be authenticated (handled by apiClient interceptor later).
  * - **Success Response:** 200 OK with JSON body: `FileNode[]`
- * - **Error Responses:**
- * - 404 Not Found: If the path doesn't exist or user doesn't have access.
- * - 401 Unauthorized: If the user is not logged in.
- * - 403 Forbidden: If the user is logged in but lacks permission for the path.
- * - 500 Internal Server Error: For general server issues.
+ * - **Error Responses:** 404 Not Found, 401 Unauthorized, 403 Forbidden, 500 Internal Server Error.
  *
  * @param path - The directory path to list (e.g., '/', '/Documents').
  * @returns A Promise resolving with an array of FileNode objects or rejecting with an ApiError.
  */
 export const listFiles = async (path: string): Promise<FileNode[]> => {
   // --- SIMULATION CODE START ---
-  // This block simulates the API call and will be replaced.
   console.log(`[SIMULATION] listFiles for path: ${path}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -126,19 +121,18 @@ export const listFiles = async (path: string): Promise<FileNode[]> => {
   try {
     console.log(`[API] Fetching files for path: ${path}`);
     const response = await apiClient.get<FileNode[]>('/files/', {
-      params: { path: path || '/' } // Ensure root path is sent correctly
+      params: { path: path || '/' }
     });
     console.log(`[API] Files fetched successfully for ${path}:`, response.data);
-    return response.data; // Axios nests the actual data in the 'data' property
+    return response.data;
   } catch (error: any) {
     console.error(`[API] Error fetching files for ${path}:`, error);
-    // Basic error transformation (can be enhanced in apiClient interceptor)
     const apiError: ApiError = {
       message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to fetch files',
       statusCode: error.response?.status,
-      detail: error.response?.data // Include full backend error detail if available
+      detail: error.response?.data
     };
-    throw apiError; // Re-throw the structured error
+    throw apiError;
   }
   */
   // --- END REAL API CALL ---
@@ -149,10 +143,10 @@ export const listFiles = async (path: string): Promise<FileNode[]> => {
  *
  * **Integration Notes:**
  * - **Backend Endpoint:** POST /api/files/mkdir/
- * - **Request Body:** JSON `{ "path": "/path/to/new_folder" }` (full path of the folder to create)
+ * - **Request Body:** JSON `{ "path": "/path/to/new_folder" }`
  * - **Authentication:** Required.
- * - **Success Response:** 201 Created with JSON body: `FileNode` (representing the newly created folder).
- * - **Error Responses:** 400 Bad Request (invalid path/name), 409 Conflict (folder exists), 401/403, 500.
+ * - **Success Response:** 201 Created with JSON body: `FileNode`.
+ * - **Error Responses:** 400, 409, 401/403, 500.
  *
  * @param parentPath - The path of the parent directory.
  * @param name - The name of the new folder.
@@ -162,39 +156,46 @@ export const createFolder = async (
   parentPath: string,
   name: string
 ): Promise<FileNode> => {
-  const fullPath = `${parentPath === "/" ? "" : parentPath}/${name}`; // Construct full path
+  const fullPath = `${parentPath === "/" ? "" : parentPath}/${name}`;
   // --- SIMULATION CODE START ---
   console.log(`[SIMULATION] createFolder: ${fullPath}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      // Basic simulation: Assume success, add to mock data (very simplified)
       if (!mockFileSystem[parentPath]) {
-        // Reject if parent doesn't exist in mock data (basic check)
         reject({
           message: `Parent path not found: ${parentPath}`,
           statusCode: 404,
         });
         return;
       }
+      // Simulate check if folder already exists in parent
+      if (
+        mockFileSystem[parentPath]?.some(
+          (node) => node.name === name && node.is_directory
+        )
+      ) {
+        reject({ message: `Folder already exists: ${name}`, statusCode: 409 });
+        return;
+      }
+
       const newFolder: FileNode = {
         id: `sim-folder-${Date.now()}`,
         name: name,
         is_directory: true,
         path: fullPath,
-        owner_username: "testuser", // Assuming current user
+        owner_username: "testuser",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      // Add to parent listing & create entry for the folder itself
       mockFileSystem[parentPath]?.push(newFolder);
-      mockFileSystem[fullPath] = [];
+      mockFileSystem[fullPath] = []; // Create entry for the new folder
       console.log("[SIMULATION] createFolder successful:", newFolder);
       resolve(newFolder);
     }, 500);
   });
   // --- SIMULATION CODE END ---
 
-  // --- REAL API CALL (Replace simulation block with this) ---
+  // --- REAL API CALL ---
   /*
   try {
     console.log(`[API] Creating folder: ${fullPath}`);
@@ -205,8 +206,7 @@ export const createFolder = async (
     console.error(`[API] Error creating folder ${fullPath}:`, error);
     const apiError: ApiError = {
       message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to create folder',
-      statusCode: error.response?.status,
-      detail: error.response?.data
+      statusCode: error.response?.status, detail: error.response?.data
     };
     throw apiError;
   }
@@ -222,7 +222,7 @@ export const createFolder = async (
  * - **Request Body:** JSON `{ "path": "/path/to/delete" }`
  * - **Authentication:** Required.
  * - **Success Response:** 204 No Content.
- * - **Error Responses:** 404 Not Found, 400 Bad Request (e.g., trying to delete root), 401/403, 500.
+ * - **Error Responses:** 404, 400, 401/403, 500.
  *
  * @param nodePath - The full path of the file or folder to delete.
  * @returns A Promise resolving on success or rejecting with an ApiError.
@@ -232,17 +232,26 @@ export const deleteNode = async (nodePath: string): Promise<void> => {
   console.log(`[SIMULATION] deleteNode: ${nodePath}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      // Basic simulation: Remove from mock data (very simplified)
       const parentPath =
         nodePath.substring(0, nodePath.lastIndexOf("/")) || "/";
+      const nodeExistsInParent = mockFileSystem[parentPath]?.some(
+        (node) => node.path === nodePath
+      );
+
+      if (!nodeExistsInParent && !mockFileSystem.hasOwnProperty(nodePath)) {
+        reject({ message: `Node not found: ${nodePath}`, statusCode: 404 });
+        return;
+      }
+
       if (mockFileSystem[parentPath]) {
         mockFileSystem[parentPath] =
           mockFileSystem[parentPath]?.filter(
             (node) => node.path !== nodePath
           ) ?? [];
       }
-      // Also remove the entry for the directory itself if it was one
       if (mockFileSystem.hasOwnProperty(nodePath)) {
+        // Basic simulation: If it's a directory, just delete its entry.
+        // A real backend would handle recursive deletion.
         delete mockFileSystem[nodePath];
       }
       console.log("[SIMULATION] deleteNode successful.");
@@ -251,18 +260,17 @@ export const deleteNode = async (nodePath: string): Promise<void> => {
   });
   // --- SIMULATION CODE END ---
 
-  // --- REAL API CALL (Replace simulation block with this) ---
+  // --- REAL API CALL ---
   /*
   try {
     console.log(`[API] Deleting node: ${nodePath}`);
-    await apiClient.delete('/files/', { data: { path: nodePath } }); // DELETE uses 'data' for body
+    await apiClient.delete('/files/', { data: { path: nodePath } });
     console.log('[API] Node deleted successfully.');
   } catch (error: any) {
     console.error(`[API] Error deleting node ${nodePath}:`, error);
     const apiError: ApiError = {
       message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to delete item',
-      statusCode: error.response?.status,
-      detail: error.response?.data
+      statusCode: error.response?.status, detail: error.response?.data
     };
     throw apiError;
   }
@@ -277,8 +285,8 @@ export const deleteNode = async (nodePath: string): Promise<void> => {
  * - **Backend Endpoint:** PATCH /api/files/rename/ (or PUT)
  * - **Request Body:** JSON `{ "path": "/path/to/old_item", "new_name": "new_item_name" }`
  * - **Authentication:** Required.
- * - **Success Response:** 200 OK with JSON body: `FileNode` (representing the renamed item with its new path).
- * - **Error Responses:** 404 Not Found, 400 Bad Request (invalid name), 409 Conflict (name exists), 401/403, 500.
+ * - **Success Response:** 200 OK with JSON body: `FileNode`.
+ * - **Error Responses:** 404, 400, 409, 401/403, 500.
  *
  * @param oldPath - The current full path of the item.
  * @param newName - The desired new name (not the full path).
@@ -292,42 +300,44 @@ export const renameNode = async (
   console.log(`[SIMULATION] renameNode: ${oldPath} to ${newName}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      // Basic simulation: Update mock data (very simplified)
       const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "/";
       const nodeIndex = mockFileSystem[parentPath]?.findIndex(
         (node) => node.path === oldPath
       );
 
       if (
-        nodeIndex !== undefined &&
-        nodeIndex !== -1 &&
-        mockFileSystem[parentPath]
+        nodeIndex === undefined ||
+        nodeIndex === -1 ||
+        !mockFileSystem[parentPath]
       ) {
-        const nodeToUpdate = mockFileSystem[parentPath]![nodeIndex]!;
-        const newPath = `${parentPath === "/" ? "" : parentPath}/${newName}`;
-        nodeToUpdate.name = newName;
-        nodeToUpdate.path = newPath;
-        nodeToUpdate.updated_at = new Date().toISOString();
-
-        // If it was a directory, update its key in mockFileSystem
-        if (
-          nodeToUpdate.is_directory &&
-          mockFileSystem.hasOwnProperty(oldPath)
-        ) {
-          mockFileSystem[newPath] = mockFileSystem[oldPath]!;
-          delete mockFileSystem[oldPath];
-          // TODO: Recursively update paths of children in simulation (complex)
-        }
-        console.log("[SIMULATION] renameNode successful:", nodeToUpdate);
-        resolve(nodeToUpdate);
-      } else {
         reject({ message: `Node not found: ${oldPath}`, statusCode: 404 });
+        return;
       }
+
+      const newPath = `${parentPath === "/" ? "" : parentPath}/${newName}`;
+      // Simulate check if name already exists in parent
+      if (mockFileSystem[parentPath]?.some((node) => node.path === newPath)) {
+        reject({ message: `Name already exists: ${newName}`, statusCode: 409 });
+        return;
+      }
+
+      const nodeToUpdate = mockFileSystem[parentPath]![nodeIndex]!;
+      nodeToUpdate.name = newName;
+      nodeToUpdate.path = newPath;
+      nodeToUpdate.updated_at = new Date().toISOString();
+
+      if (nodeToUpdate.is_directory && mockFileSystem.hasOwnProperty(oldPath)) {
+        mockFileSystem[newPath] = mockFileSystem[oldPath]!;
+        delete mockFileSystem[oldPath];
+        // TODO: Simulate recursive path updates for children (complex)
+      }
+      console.log("[SIMULATION] renameNode successful:", nodeToUpdate);
+      resolve(nodeToUpdate);
     }, 500);
   });
   // --- SIMULATION CODE END ---
 
-  // --- REAL API CALL (Replace simulation block with this) ---
+  // --- REAL API CALL ---
   /*
     try {
       console.log(`[API] Renaming node: ${oldPath} to ${newName}`);
@@ -338,8 +348,7 @@ export const renameNode = async (
       console.error(`[API] Error renaming node ${oldPath}:`, error);
       const apiError: ApiError = {
         message: error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to rename item',
-        statusCode: error.response?.status,
-        detail: error.response?.data
+        statusCode: error.response?.status, detail: error.response?.data
       };
       throw apiError;
     }
@@ -347,4 +356,4 @@ export const renameNode = async (
   // --- END REAL API CALL ---
 };
 
-// Add other simulated functions (upload, download, share, etc.) later with similar integration comments...
+// Add other simulated functions (upload, download, share, etc.) later...

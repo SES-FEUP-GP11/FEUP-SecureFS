@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import MainLayout from "./layouts/MainLayout";
 import PrivateRoute from "./components/Common/PrivateRoute";
-import FilesPage from "./pages/FilesPage";
+import FilesPage from "./pages/FilesPage"; // Use the updated FilesPage
 
 export default function App() {
   console.log("[App.tsx] Rendering App component");
@@ -17,22 +17,17 @@ export default function App() {
 
         {/* ---------- PROTECTED ---------- */}
         <Route element={<PrivateRoute />}>
-          {/* layout route — MUST contain an <Outlet/> */}
           <Route element={<MainLayout />}>
-            <Route path="files">
-              {/* index renders on “/files” */}
-              <Route index element={<FilesPage />} />
+            {/* Use a splat route for files to capture nested paths */}
+            <Route path="files/*" element={<FilesPage />} />
 
-              {/* star (“splat”) captures everything under /files/... */}
-              <Route path="*" element={<FilesPage />} />
-            </Route>
-
-            {/* default after login → /files */}
-            <Route index element={<Navigate to="files" replace />} />
+            {/* Default route after login redirects to the base files path */}
+            <Route index element={<Navigate to="/files" replace />} />
           </Route>
         </Route>
 
         {/* ---------- FALLBACK ---------- */}
+        {/* Consider a dedicated 404 component later */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
