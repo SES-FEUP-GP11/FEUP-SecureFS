@@ -1,10 +1,10 @@
-import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage";
 import MainLayout from "./layouts/MainLayout";
 import PrivateRoute from "./components/Common/PrivateRoute";
-import FilesPage from "./pages/FilesPage"; // Use the updated FilesPage
+import FilesPage from "./pages/FilesPage";
+import PublicFilesPage from "./pages/PublicFilesPage.tsx";
 
 export default function App() {
   console.log("[App.tsx] Rendering App component");
@@ -14,6 +14,8 @@ export default function App() {
       <Routes>
         {/* ---------- PUBLIC ---------- */}
         <Route path="/login" element={<LoginPage />} />
+
+        <Route path="/public/*" element={<PublicFilesPage />} />
 
         {/* ---------- PROTECTED ---------- */}
         <Route element={<PrivateRoute />}>

@@ -6,6 +6,16 @@ import apiClient from "./apiClient";
 const mockFileSystem: Record<string, FileNode[]> = {
   "/": [
     {
+      id: "sim-folder-public",
+      name: "public",
+      is_directory: true,
+      path: "/public",
+      owner_username: "testuser",
+      is_public: true, // Mark as public folder
+      created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+      updated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+    },
+    {
       id: "sim-folder-docs",
       name: "Docs",
       is_directory: true,
@@ -33,6 +43,58 @@ const mockFileSystem: Record<string, FileNode[]> = {
       owner_username: "testuser",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+    },
+  ],
+  // Public folder contents for testuser
+  "/public": [
+    {
+      id: "sim-file-public-readme",
+      name: "README.md",
+      is_directory: false,
+      path: "/public/README.md",
+      size: 2048,
+      mime_type: "text/markdown",
+      owner_username: "testuser",
+      is_public: true,
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      updated_at: new Date(Date.now() - 86400000).toISOString(),
+    },
+    {
+      id: "sim-file-public-portfolio",
+      name: "portfolio.html",
+      is_directory: false,
+      path: "/public/portfolio.html",
+      size: 5120,
+      mime_type: "text/html",
+      owner_username: "testuser",
+      is_public: true,
+      created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+      updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+    },
+    {
+      id: "sim-folder-public-assets",
+      name: "assets",
+      is_directory: true,
+      path: "/public/assets",
+      owner_username: "testuser",
+      is_public: true,
+      created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+      updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+    },
+  ],
+
+  "/public/assets": [
+    {
+      id: "sim-file-public-logo",
+      name: "logo.png",
+      is_directory: false,
+      path: "/public/assets/logo.png",
+      size: 10240,
+      mime_type: "image/png",
+      owner_username: "testuser",
+      is_public: true,
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      updated_at: new Date(Date.now() - 86400000).toISOString(),
     },
   ],
   "/Docs": [
@@ -157,6 +219,12 @@ export const listFiles = async (path: string): Promise<FileNode[]> => {
     }, 300); // Reduced delay for faster testing
   });
 };
+
+export const listPublicFiles = async (path: string = "/"): Promise<FileNode[]> => {
+  console.log(`[SIMULATION] listPublicFiles for path: ${path}`);
+  return listFiles(path, true);
+};
+
 
 export const createFolder = async (
   parentPath: string,

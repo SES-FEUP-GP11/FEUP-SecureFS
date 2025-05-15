@@ -21,6 +21,7 @@ export interface FileNode {
   size?: number; // Size in bytes (for files)
   mime_type?: string; // MIME type (for files, e.g., "text/plain", "image/jpeg")
   owner_username?: string; // Username of the owner
+  is_public?: boolean; // True if the node is publicly accessible
   created_at: string; // ISO 8601 date string
   updated_at: string; // ISO 8601 date string
   // Permissions specific to the *requesting* user might be added by the backend later

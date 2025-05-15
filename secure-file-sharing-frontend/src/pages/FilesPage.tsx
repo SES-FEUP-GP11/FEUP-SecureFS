@@ -1,24 +1,25 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import type { FileNode, ApiError } from "../types";
+import React, {useCallback, useEffect, useState} from "react";
+import {Link, useNavigate, useParams} from "react-router-dom";
+import type {ApiError, FileNode} from "../types";
 import {
-  listFiles,
-  createFolder as createFolderService,
-  renameNode as renameNodeService, // Import renameNodeService
+    createFolder as createFolderService,
+    listFiles,
+    renameNode as renameNodeService,
 } from "../services/fileService";
 import {
-  Folder,
-  File as FileIcon,
-  AlertCircle,
-  Loader2,
-  PlusCircle,
-  MoreVertical,
-  Edit3, // Import icons
+    AlertCircle,
+    Edit3,
+    File as FileIcon,
+    Folder,
+    Globe,
+    Loader2,
+    Lock,
+    MoreVertical,
+    PlusCircle,
 } from "lucide-react";
-import { useAuth } from "../hooks/useAuth";
-import Breadcrumbs from "../components/Files/Breadcrumbs";
-import CreateFolderModal from "../components/Files/CreateFolderModal";
-import RenameModal from "../components/Files/RenameModal"; // Import the RenameModal
+import Breadcrumbs from "../components/files/Breadcrumbs";
+import CreateFolderModal from "../components/files/CreateFolderModal";
+import RenameModal from "../components/files/RenameModal";
 
 /**
  * Page component for browsing files and folders.
@@ -149,65 +150,87 @@ const FilesPage: React.FC = () => {
     return `${(sizeInBytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
   };
 
-  // --- Render Logic ---
-  // FIXED: Replaced comments with actual JSX for loading and error states
-  if (isLoading && files.length === 0) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-        <span className="ml-2 text-gray-600">Loading files...</span>
-      </div>
-    );
-  }
-  if (error && files.length === 0) {
-    return (
-      <div
-        className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative flex items-center"
-        role="alert"
-      >
-        <AlertCircle className="h-5 w-5 mr-2" />
-        <strong className="font-bold mr-1">Error:</strong>
-        <span className="block sm:inline">{error.message}</span>
-      </div>
-    );
-  }
+    // Check if we're currently in the public folder
+    const isInPublicFolder = currentDirectoryPath.startsWith('/public');
 
-  return (
-    <div className="bg-white shadow rounded-lg p-6">
-      {/* Header and Breadcrumbs */}
-      <div className="mb-4 pb-4 border-b border-gray-200">
-        <Breadcrumbs currentPath={currentDirectoryPath} />
-        <div className="flex justify-between items-center mt-2">
-          <h1 className="text-xl md:text-2xl font-semibold text-gray-800">
-            Contents of:{" "}
-            <span className="font-mono text-indigo-700">
-              {currentDirectoryPath === "/" ? "Root" : currentDirectoryPath}
-            </span>
-          </h1>
-          <div>
-            <button
-              onClick={() => setIsCreateFolderModalOpen(true)}
-              className="flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+    // --- Render Logic ---
+    // FIXED: Replaced comments with actual JSX for loading and error states
+    if (isLoading && files.length === 0) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-600"/>
+                <span className="ml-2 text-gray-600">Loading files...</span>
+            </div>
+        );
+    }
+
+    if (error && files.length === 0) {
+        return (
+            <div
+                className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative flex items-center"
+                role="alert"
             >
-              <PlusCircle size={18} className="mr-2" />
-              Create Folder
-            </button>
-          </div>
-        </div>
-      </div>
+                <AlertCircle className="h-5 w-5 mr-2"/>
+                <strong className="font-bold mr-1">Error:</strong>
+                <span className="block sm:inline">{error.message}</span>
+            </div>
+        );
+    }
 
-      {/* Inline loading/error for subsequent loads */}
-      {isLoading && files.length > 0 && (
-        <div className="text-center py-4 text-gray-500">
-          <Loader2 className="h-6 w-6 animate-spin inline mr-2" /> Loading
-          more...
-        </div>
-      )}
-      {error && files.length > 0 && (
-        <div className="my-2 p-3 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm">
-          Error refreshing content: {error.message}
-        </div>
-      )}
+    return (
+        <div className="bg-white shadow rounded-lg p-6">
+            {/* Header and Breadcrumbs */}
+            <div className="mb-4 pb-4 border-b border-gray-200">
+                <Breadcrumbs currentPath={currentDirectoryPath}/>
+                <div className="flex justify-between items-center mt-2">
+                    <div>
+                        <div className="flex items-center">
+                            <h1 className="text-xl md:text-2xl font-semibold text-gray-800">
+                                Contents of:{" "}
+                                <span className="font-mono text-indigo-700">
+                  {currentDirectoryPath === "/" ? "Root" : currentDirectoryPath}
+                </span>
+                            </h1>
+
+                        </div>
+                        {isInPublicFolder && (
+                            <p className="text-sm text-green-700 mt-1">
+                                Files in this folder are publicly accessible to everyone
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex space-x-2">
+                        {/* Link to browse public files */}
+                        <Link
+                            to="/public"
+                            className="flex items-center px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            <Globe size={18} className="mr-2"/>
+                            Browse Public Files
+                        </Link>
+                        <button
+                            onClick={() => setIsCreateFolderModalOpen(true)}
+                            className="flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            <PlusCircle size={18} className="mr-2"/>
+                            Create Folder
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Inline loading/error for subsequent loads */}
+            {isLoading && files.length > 0 && (
+                <div className="text-center py-4 text-gray-500">
+                    <Loader2 className="h-6 w-6 animate-spin inline mr-2"/> Loading
+                    more...
+                </div>
+            )}
+            {error && files.length > 0 && (
+                <div className="my-2 p-3 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm">
+                    Error refreshing content: {error.message}
+                </div>
+            )}
 
       {/* File Listing Area */}
       {/* FIXED: Replaced comment with actual JSX for empty folder state */}
@@ -220,86 +243,95 @@ const FilesPage: React.FC = () => {
         </div>
       )}
 
-      {files.length > 0 && (
-        <ul className="divide-y divide-gray-200">
-          {files.map((file) => (
-            <li
-              key={file.id}
-              className="flex items-center justify-between px-2 py-3 hover:bg-gray-100 rounded-md cursor-pointer transition-colors duration-150 group relative" // Added group and relative for context menu
-              onClick={(e) => handleItemClick(file, e)}
-            >
-              <div className="flex items-center min-w-0 flex-1 mr-4">
-                {file.is_directory ? (
-                  <Folder className="h-5 w-5 mr-3 text-blue-500 flex-shrink-0" />
-                ) : (
-                  <FileIcon className="h-5 w-5 mr-3 text-gray-500 flex-shrink-0" />
-                )}
-                <span className="text-gray-800 truncate font-medium text-sm">
-                  {file.name}
-                </span>
-              </div>
+            {files.length > 0 && (
+                <ul className="divide-y divide-gray-200">
+                    {files.map((file) => (
+                        <li
+                            key={file.id}
+                            className="flex items-center justify-between px-2 py-3 hover:bg-gray-100 rounded-md cursor-pointer transition-colors duration-150 group relative"
+                            onClick={(e) => handleItemClick(file, e)}
+                        >
+                            <div className="flex items-center min-w-0 flex-1 mr-4">
+                                <div className="flex items-center">
+                                    {file.is_directory ? (
+                                        <Folder className="h-5 w-5 mr-3 text-blue-500 flex-shrink-0"/>
+                                    ) : (
+                                        <FileIcon className="h-5 w-5 mr-3 text-gray-500 flex-shrink-0"/>
+                                    )}
+                                    {/* Public/Private indicator */}
+                                    {file.is_public || file.name === 'public' ? (
+                                        <Globe className="h-4 w-4 mr-2 text-green-600 flex-shrink-0" title="Public"/>
+                                    ) : (
+                                        <Lock className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" title="Private"/>
+                                    )}
+                                </div>
+                                <div className="min-w-0">
+                  <span className="text-gray-800 truncate font-medium text-sm block">
+                    {file.name}
+                  </span>
+                                    {file.name === 'public' && (
+                                        <span className="text-xs text-green-600">
+                      Files here are visible to everyone
+                    </span>
+                                    )}
+                                </div>
+                            </div>
 
-              <div className="flex items-center space-x-2 flex-shrink-0">
-                {" "}
-                {/* Reduced space for context menu */}
-                {!file.is_directory && file.size !== undefined && (
-                  <span className="text-xs text-gray-500 hidden md:block">
+                            <div className="flex items-center space-x-2 flex-shrink-0">
+                                {!file.is_directory && file.size !== undefined && (
+                                    <span className="text-xs text-gray-500 hidden md:block">
                     {formatFileSize(file.size)}
                   </span>
-                )}
-                <span className="text-xs text-gray-500 hidden sm:block">
+                                )}
+                                <span className="text-xs text-gray-500 hidden sm:block">
                   {new Date(file.updated_at).toLocaleDateString()}
                 </span>
-                {/* Context Menu Button */}
-                <button
-                  onClick={(e) => toggleContextMenu(file.id, e)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 context-menu-button" // Added class for event delegation
-                  aria-label="More options"
-                >
-                  <MoreVertical size={18} />
-                </button>
-                {/* Context Menu Dropdown */}
-                {activeContextMenu === file.id && (
-                  <div
-                    className="absolute right-0 top-8 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 border border-gray-200"
-                    onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside menu
-                  >
-                    <button
-                      onClick={() => openRenameModal(file)}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
-                    >
-                      <Edit3 size={16} className="mr-2" /> Rename
-                    </button>
-                    {/* Add Delete option here later */}
-                    {/* <button className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center">
-                        <Trash2 size={16} className="mr-2" /> Delete
-                      </button> */}
-                  </div>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                                {/* Context Menu Button */}
+                                <button
+                                    onClick={(e) => toggleContextMenu(file.id, e)}
+                                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 context-menu-button"
+                                    aria-label="More options"
+                                >
+                                    <MoreVertical size={18}/>
+                                </button>
+                                {/* Context Menu Dropdown */}
+                                {activeContextMenu === file.id && (
+                                    <div
+                                        className="absolute right-0 top-8 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 border border-gray-200"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <button
+                                            onClick={() => openRenameModal(file)}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
+                                        >
+                                            <Edit3 size={16} className="mr-2"/> Rename
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
 
-      {/* Modals */}
-      <CreateFolderModal
-        isOpen={isCreateFolderModalOpen}
-        onClose={() => setIsCreateFolderModalOpen(false)}
-        onCreate={handleCreateFolder}
-        parentPath={currentDirectoryPath}
-      />
-      <RenameModal
-        isOpen={isRenameModalOpen}
-        onClose={() => {
-          setIsRenameModalOpen(false);
-          setItemToRename(null); // Clear item when closing
-        }}
-        onRename={handleRenameItem}
-        itemToRename={itemToRename}
-      />
-    </div>
-  );
+            {/* Modals */}
+            <CreateFolderModal
+                isOpen={isCreateFolderModalOpen}
+                onClose={() => setIsCreateFolderModalOpen(false)}
+                onCreate={handleCreateFolder}
+                parentPath={currentDirectoryPath}
+            />
+            <RenameModal
+                isOpen={isRenameModalOpen}
+                onClose={() => {
+                    setIsRenameModalOpen(false);
+                    setItemToRename(null);
+                }}
+                onRename={handleRenameItem}
+                itemToRename={itemToRename}
+            />
+        </div>
+    );
 };
 
 export default FilesPage;
