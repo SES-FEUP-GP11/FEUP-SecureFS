@@ -45,7 +45,6 @@ const mockFileSystem: Record<string, FileNode[]> = {
       updated_at: new Date().toISOString(),
     },
   ],
-  // Public folder contents for testuser
   "/public": [
     {
       id: "sim-file-public-readme",
@@ -82,7 +81,6 @@ const mockFileSystem: Record<string, FileNode[]> = {
       updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
     },
   ],
-
   "/public/assets": [
     {
       id: "sim-file-public-logo",
@@ -155,36 +153,26 @@ const mockFileSystem: Record<string, FileNode[]> = {
       updated_at: new Date().toISOString(),
     },
   ],
-  "/Docs/Archive": [], // Empty directory
+  "/Docs/Archive": [],
 };
 // --- END SIMULATION DATA ---
 
-// Helper function for renameNode simulation to recursively update paths
 const recursivelyUpdatePathsAndMoveChildren = (
   oldDirKey: string,
   newDirKey: string
 ) => {
-  if (!mockFileSystem.hasOwnProperty(oldDirKey)) {
-    return; // Source directory doesn't exist in mock, nothing to do
-  }
-
+  if (!mockFileSystem.hasOwnProperty(oldDirKey)) return;
   const childrenToMove = mockFileSystem[oldDirKey]!;
-  delete mockFileSystem[oldDirKey]; // Remove old directory entry
-
-  mockFileSystem[newDirKey] = []; // Create new directory entry
-
+  delete mockFileSystem[oldDirKey];
+  mockFileSystem[newDirKey] = [];
   for (const child of childrenToMove) {
     const oldChildPath = child.path;
-    // Replace only the beginning of the path that matches oldDirKey
     const newChildPath = oldChildPath.startsWith(oldDirKey + "/")
       ? newDirKey + oldChildPath.substring(oldDirKey.length)
-      : newDirKey + "/" + child.name; // Fallback for direct children if path was just oldDirKey
-
+      : newDirKey + "/" + child.name;
     const updatedChild = { ...child, path: newChildPath };
     mockFileSystem[newDirKey].push(updatedChild);
-
     if (updatedChild.is_directory) {
-      // Recursively call for subdirectories, using their original old path and new path
       recursivelyUpdatePathsAndMoveChildren(oldChildPath, newChildPath);
     }
   }
@@ -193,18 +181,31 @@ const recursivelyUpdatePathsAndMoveChildren = (
   );
 };
 
-export const listFiles = async (path: string): Promise<FileNode[]> => {
-  // ... (listFiles implementation remains the same)
-  console.log(`[SIMULATION] listFiles for path: ${path}`);
+export const listFiles = async (
+  path: string,
+  isPublicContext: boolean = false
+): Promise<FileNode[]> => {
+  console.log(
+    `[SIMULATION] listFiles for path: ${path}${
+      isPublicContext ? " (Public Context)" : ""
+    }`
+  );
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       const normalizedPath = path || "/";
       if (mockFileSystem.hasOwnProperty(normalizedPath)) {
+        // If public context, filter for public items, otherwise return all
+        const items = isPublicContext
+          ? mockFileSystem[normalizedPath]!.filter(
+              (item) => item.is_public || item.path.startsWith("/public/")
+            ) // Simplified: check item flag or if under /public
+          : [...mockFileSystem[normalizedPath]!]; // Return a copy for private context
+
         console.log(
           `[SIMULATION] listFiles successful for ${normalizedPath}:`,
-          mockFileSystem[normalizedPath]
+          items
         );
-        resolve([...mockFileSystem[normalizedPath]]); // Return a copy
+        resolve(items);
       } else {
         const error: ApiError = {
           message: `Directory not found: ${normalizedPath}`,
@@ -216,21 +217,30 @@ export const listFiles = async (path: string): Promise<FileNode[]> => {
         );
         reject(error);
       }
-    }, 300); // Reduced delay for faster testing
+    }, 300);
   });
 };
 
-export const listPublicFiles = async (path: string = "/"): Promise<FileNode[]> => {
+// listPublicFiles was provided by user, ensuring it's kept
+export const listPublicFiles = async (
+  path: string = "/"
+): Promise<FileNode[]> => {
   console.log(`[SIMULATION] listPublicFiles for path: ${path}`);
+  // For simulation, we can reuse listFiles and ensure it only returns public items.
+  // This assumes listFiles can differentiate or the paths are distinct.
+  // A more robust simulation might have a separate mockPublicFileSystem or filter logic.
+  // For now, we'll assume path for public files starts with '/public'
+  if (!path.startsWith("/public") && path !== "/") {
+    // If trying to list non-public root as public, treat as root of public
+    return listFiles("/public", true);
+  }
   return listFiles(path, true);
 };
-
 
 export const createFolder = async (
   parentPath: string,
   name: string
 ): Promise<FileNode> => {
-  // ... (createFolder implementation remains the same)
   const fullPath = `${parentPath === "/" ? "" : parentPath}/${name}`;
   console.log(`[SIMULATION] createFolder: ${fullPath}`);
   return new Promise((resolve, reject) => {
@@ -258,6 +268,7 @@ export const createFolder = async (
         owner_username: "testuser",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        is_public: parentPath.startsWith("/public"), // Inherit public status if created in public folder
       };
       mockFileSystem[parentPath]?.push(newFolder);
       mockFileSystem[fullPath] = [];
@@ -267,8 +278,73 @@ export const createFolder = async (
   });
 };
 
+export const renameNode = async (
+  oldPath: string,
+  newName: string
+): Promise<FileNode> => {
+  console.log(
+    `[SIMULATION] renameNode: from "${oldPath}" to new name "${newName}"`
+  );
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "/";
+      const nodeIndex = mockFileSystem[parentPath]?.findIndex(
+        (node) => node.path === oldPath
+      );
+      if (
+        nodeIndex === undefined ||
+        nodeIndex === -1 ||
+        !mockFileSystem[parentPath]
+      ) {
+        console.error(
+          `[SIMULATION] renameNode: Node not found in parent list: ${oldPath}`
+        );
+        reject({ message: `Node not found: ${oldPath}`, statusCode: 404 });
+        return;
+      }
+      const itemToUpdate = mockFileSystem[parentPath]![nodeIndex]!;
+      const newFullPath = `${parentPath === "/" ? "" : parentPath}/${newName}`;
+      if (
+        mockFileSystem[parentPath]!.some(
+          (node) => node.name === newName && node.path !== oldPath
+        )
+      ) {
+        console.error(
+          `[SIMULATION] renameNode: Name conflict for "${newName}" in "${parentPath}"`
+        );
+        reject({
+          message: `An item named "${newName}" already exists in this location.`,
+          statusCode: 409,
+        });
+        return;
+      }
+      const updatedItemInParentList: FileNode = {
+        ...itemToUpdate,
+        name: newName,
+        path: newFullPath,
+        updated_at: new Date().toISOString(),
+      };
+      mockFileSystem[parentPath]![nodeIndex] = updatedItemInParentList;
+      console.log(
+        `[SIMULATION] renameNode: Updated item in parent list. New path: ${newFullPath}`
+      );
+      if (itemToUpdate.is_directory) {
+        console.log(
+          `[SIMULATION] renameNode: Item is a directory. Old key: ${oldPath}, New key: ${newFullPath}`
+        );
+        recursivelyUpdatePathsAndMoveChildren(oldPath, newFullPath);
+      }
+      console.log(
+        "[SIMULATION] renameNode successful, returning:",
+        updatedItemInParentList
+      );
+      resolve(updatedItemInParentList);
+    }, 300);
+  });
+};
+
+// deleteNode from your provided version
 export const deleteNode = async (nodePath: string): Promise<void> => {
-  // ... (deleteNode implementation remains the same)
   console.log(`[SIMULATION] deleteNode: ${nodePath}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -289,8 +365,9 @@ export const deleteNode = async (nodePath: string): Promise<void> => {
           ) ?? [];
       }
       if (mockFileSystem.hasOwnProperty(nodePath)) {
-        // For simulation, if it's a directory, we also need to remove its children's entries if they were flat
-        // This simple delete won't handle deep recursive deletes of mockFileSystem keys.
+        // Basic simulation: if it's a directory, just remove its key.
+        // A real backend would handle recursive deletion of contents.
+        // For a more robust simulation, we might need to recursively delete child keys from mockFileSystem.
         delete mockFileSystem[nodePath];
       }
       console.log("[SIMULATION] deleteNode successful.");
@@ -299,85 +376,55 @@ export const deleteNode = async (nodePath: string): Promise<void> => {
   });
 };
 
-/**
- * Renames a file or folder.
- *
- * **Integration Notes:** (comments remain the same)
- *
- * @param oldPath - The current full path of the item.
- * @param newName - The desired new name (not the full path).
- * @returns A Promise resolving with the updated FileNode or rejecting with an ApiError.
- */
-export const renameNode = async (
-  oldPath: string,
-  newName: string
+// uploadFile function from previous step, ensuring it's included
+export const uploadFile = async (
+  file: File,
+  targetPath: string
 ): Promise<FileNode> => {
+  const fullPath = `${targetPath === "/" ? "" : targetPath}/${file.name}`;
   console.log(
-    `[SIMULATION] renameNode: from "${oldPath}" to new name "${newName}"`
+    `[SIMULATION] uploadFile: Uploading "${file.name}" to "${targetPath}" (full path: ${fullPath})`
   );
+
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "/";
-      const nodeIndex = mockFileSystem[parentPath]?.findIndex(
-        (node) => node.path === oldPath
-      );
-
-      if (
-        nodeIndex === undefined ||
-        nodeIndex === -1 ||
-        !mockFileSystem[parentPath]
-      ) {
+      if (!mockFileSystem.hasOwnProperty(targetPath)) {
         console.error(
-          `[SIMULATION] renameNode: Node not found in parent list: ${oldPath}`
-        );
-        reject({ message: `Node not found: ${oldPath}`, statusCode: 404 });
-        return;
-      }
-
-      const itemToUpdate = mockFileSystem[parentPath]![nodeIndex]!;
-      const newFullPath = `${parentPath === "/" ? "" : parentPath}/${newName}`;
-
-      // Check for name conflict in the same directory
-      if (
-        mockFileSystem[parentPath]!.some(
-          (node) => node.name === newName && node.path !== oldPath
-        )
-      ) {
-        console.error(
-          `[SIMULATION] renameNode: Name conflict for "${newName}" in "${parentPath}"`
+          `[SIMULATION] uploadFile: Target directory "${targetPath}" not found.`
         );
         reject({
-          message: `An item named "${newName}" already exists in this location.`,
-          statusCode: 409,
+          message: `Target directory not found: ${targetPath}`,
+          statusCode: 404,
         });
         return;
       }
-
-      // Update the item in its parent's list
-      const updatedItemInParentList: FileNode = {
-        ...itemToUpdate,
-        name: newName,
-        path: newFullPath,
-        updated_at: new Date().toISOString(),
-      };
-      mockFileSystem[parentPath]![nodeIndex] = updatedItemInParentList;
-      console.log(
-        `[SIMULATION] renameNode: Updated item in parent list. New path: ${newFullPath}`
-      );
-
-      // If it was a directory, handle its children and its own entry in mockFileSystem
-      if (itemToUpdate.is_directory) {
-        console.log(
-          `[SIMULATION] renameNode: Item is a directory. Old key: ${oldPath}, New key: ${newFullPath}`
+      if (
+        mockFileSystem[targetPath]?.some(
+          (node) => node.name === file.name && !node.is_directory
+        )
+      ) {
+        console.warn(
+          `[SIMULATION] uploadFile: File "${file.name}" already exists in "${targetPath}". Overwriting.`
         );
-        recursivelyUpdatePathsAndMoveChildren(oldPath, newFullPath);
+        mockFileSystem[targetPath] = mockFileSystem[targetPath]!.filter(
+          (node) => node.name !== file.name
+        );
       }
-
-      console.log(
-        "[SIMULATION] renameNode successful, returning:",
-        updatedItemInParentList
-      );
-      resolve(updatedItemInParentList); // Return the updated node as it appears in its parent's list
-    }, 300);
+      const newFileNode: FileNode = {
+        id: `sim-file-${Date.now()}`,
+        name: file.name,
+        is_directory: false,
+        path: fullPath,
+        size: file.size,
+        mime_type: file.type || "application/octet-stream",
+        owner_username: "testuser",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_public: targetPath.startsWith("/public"), // Inherit public status
+      };
+      mockFileSystem[targetPath]?.push(newFileNode);
+      console.log("[SIMULATION] uploadFile successful:", newFileNode);
+      resolve(newFileNode);
+    }, 1200);
   });
 };
