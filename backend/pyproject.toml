@@ -1,9 +1,32 @@
 [project]
 name = "backend"
 version = "0.1.0"
-requires-python = ">=3.11"
+requires-python = ">=3.13.1"
 dependencies = [
+    "black>=25.1.0",
     "django>=5.2.1",
     "djangorestframework>=3.16.0",
+    "djangorestframework-simplejwt>=5.5.0",
+    "flake8>=7.2.0",
+    "isort>=6.0.1",
+    "pre-commit>=4.2.0",
     "psycopg2-binary>=2.9.10",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
+exclude = [
+  ".venv",
+  "staticfiles",
+  "node_modules",
+  "__pycache__",
 ]
