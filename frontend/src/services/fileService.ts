@@ -1,8 +1,6 @@
 import type { FileNode, ApiError } from "../types";
 import apiClient from "./apiClient";
 
-// --- Mock File System Data (FOR SIMULATION ONLY) ---
-// This data will be replaced by actual backend responses.
 const mockFileSystem: Record<string, FileNode[]> = {
   "/": [
     {
@@ -11,6 +9,7 @@ const mockFileSystem: Record<string, FileNode[]> = {
       is_directory: true,
       path: "/public",
       owner_username: "testuser",
+      is_public: true,
       created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
       updated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
     },
@@ -159,31 +158,23 @@ const recursivelyUpdatePathsAndMoveChildren = (
   oldDirKey: string,
   newDirKey: string
 ) => {
-    return; // Source directory doesn't exist in mock, nothing to do
-  }
-
+  if (!mockFileSystem.hasOwnProperty(oldDirKey)) return;
   const childrenToMove = mockFileSystem[oldDirKey]!;
-  delete mockFileSystem[oldDirKey]; // Remove old directory entry
-
-  mockFileSystem[newDirKey] = []; // Create new directory entry
+  delete mockFileSystem[oldDirKey];
+  mockFileSystem[newDirKey] = [];
   for (const child of childrenToMove) {
     const oldChildPath = child.path;
     const newChildPath = oldChildPath.startsWith(oldDirKey + "/")
       ? newDirKey + oldChildPath.substring(oldDirKey.length)
+      : newDirKey + "/" + child.name;
       : newDirKey + "/" + child.name;
     const updatedChild = { ...child, path: newChildPath };
     mockFileSystem[newDirKey].push(updatedChild);
     if (updatedChild.is_directory)
       recursivelyUpdatePathsAndMoveChildren(oldChildPath, newChildPath);
   }
-  console.log(
-    `[SIMULATION Helper] Moved children from ${oldDirKey} to ${newDirKey} and updated paths.`
-  );
 };
 
-export const listFiles = async (path: string): Promise<FileNode[]> => {
-  // ... (listFiles implementation remains the same)
-  console.log(`[SIMULATION] listFiles for path: ${path}`);
 export const listFiles = async (
   path: string,
   isPublicContext: boolean = false
@@ -197,9 +188,7 @@ export const listFiles = async (
     setTimeout(() => {
       const normalizedPath = path || "/";
       if (mockFileSystem.hasOwnProperty(normalizedPath)) {
-          mockFileSystem[normalizedPath]
-        );
-        resolve([...mockFileSystem[normalizedPath]]); // Return a copy
+        const items = isPublicContext
           ? mockFileSystem[normalizedPath]!.filter(
               (item) => item.is_public || item.path.startsWith("/public/")
             )
@@ -209,27 +198,18 @@ export const listFiles = async (
         reject({
           message: `Directory not found: ${normalizedPath}`,
           statusCode: 404,
-          error
-        );
-        reject(error);
+        });
       }
     }, 300);
   });
 };
 
-// listPublicFiles was provided by user, ensuring it's kept
 export const listPublicFiles = async (
   path: string = "/"
 ): Promise<FileNode[]> => {
   console.log(`[SIMULATION] listPublicFiles for path: ${path}`);
-  // For simulation, we can reuse listFiles and ensure it only returns public items.
-  // This assumes listFiles can differentiate or the paths are distinct.
-  // A more robust simulation might have a separate mockPublicFileSystem or filter logic.
-  // For now, we'll assume path for public files starts with '/public'
-  if (!path.startsWith("/public") && path !== "/") {
-    // If trying to list non-public root as public, treat as root of public
+  if (!path.startsWith("/public") && path !== "/")
     return listFiles("/public", true);
-  }
   return listFiles(path, true);
 };
 
@@ -238,7 +218,6 @@ export const createFolder = async (
   name: string
 ): Promise<FileNode> => {
   const fullPath = `${parentPath === "/" ? "" : parentPath}/${name}`;
-  console.log(`[SIMULATION] createFolder: ${fullPath}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (!mockFileSystem[parentPath]) {
@@ -264,11 +243,10 @@ export const createFolder = async (
         owner_username: "testuser",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        is_public: parentPath.startsWith("/public"), // Inherit public status if created in public folder
+        is_public: parentPath.startsWith("/public"),
       };
       mockFileSystem[parentPath]?.push(newFolder);
       mockFileSystem[fullPath] = [];
-      console.log("[SIMULATION] createFolder successful:", newFolder);
       resolve(newFolder);
     }, 300);
   });
@@ -278,103 +256,12 @@ export const renameNode = async (
   oldPath: string,
   newName: string
 ): Promise<FileNode> => {
-  console.log(
-    `[SIMULATION] renameNode: from "${oldPath}" to new name "${newName}"`
-  );
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "/";
       const nodeIndex = mockFileSystem[parentPath]?.findIndex(
         (node) => node.path === oldPath
       );
-      if (
-        nodeIndex === undefined ||
-        nodeIndex === -1 ||
-        !mockFileSystem[parentPath]
-      ) {
-        console.error(
-          `[SIMULATION] renameNode: Node not found in parent list: ${oldPath}`
-        );
-        reject({ message: `Node not found: ${oldPath}`, statusCode: 404 });
-        return;
-      }
-      const itemToUpdate = mockFileSystem[parentPath]![nodeIndex]!;
-      const newFullPath = `${parentPath === "/" ? "" : parentPath}/${newName}`;
-      if (
-        mockFileSystem[parentPath]!.some(
-          (node) => node.name === newName && node.path !== oldPath
-        )
-      ) {
-        console.error(
-          `[SIMULATION] renameNode: Name conflict for "${newName}" in "${parentPath}"`
-        );
-        reject({
-          message: `An item named "${newName}" already exists in this location.`,
-          statusCode: 409,
-        });
-        return;
-      }
-      const updatedItemInParentList: FileNode = {
-        ...itemToUpdate,
-        name: newName,
-        path: newFullPath,
-        updated_at: new Date().toISOString(),
-      };
-      mockFileSystem[parentPath]![nodeIndex] = updatedItemInParentList;
-      console.log(
-        `[SIMULATION] renameNode: Updated item in parent list. New path: ${newFullPath}`
-      );
-      if (itemToUpdate.is_directory) {
-        console.log(
-          `[SIMULATION] renameNode: Item is a directory. Old key: ${oldPath}, New key: ${newFullPath}`
-        );
-        recursivelyUpdatePathsAndMoveChildren(oldPath, newFullPath);
-      }
-      console.log(
-        "[SIMULATION] renameNode successful, returning:",
-        updatedItemInParentList
-      );
-      resolve(updatedItemInParentList);
-    }, 300);
-  });
-};
-
-// deleteNode from your provided version
-export const deleteNode = async (nodePath: string): Promise<void> => {
-  console.log(`[SIMULATION] deleteNode: ${nodePath}`);
-      if (mockFileSystem[parentPath]) {
-        mockFileSystem[parentPath] =
-          mockFileSystem[parentPath]?.filter(
-            (node) => node.path !== nodePath
-          ) ?? [];
-      }
-      if (mockFileSystem.hasOwnProperty(nodePath)) {
-        // Basic simulation: if it's a directory, just remove its key.
-        // A real backend would handle recursive deletion of contents.
-        // For a more robust simulation, we might need to recursively delete child keys from mockFileSystem.
-        delete mockFileSystem[nodePath];
-      }
-      console.log("[SIMULATION] deleteNode successful.");
-      resolve();
-    }, 300);
-};
-
-export const renameNode = async (
-  oldPath: string,
-  newName: string
-): Promise<FileNode> => {
-  const fullPath = `${targetPath === "/" ? "" : targetPath}/${file.name}`;
-  console.log(
-    `[SIMULATION] uploadFile: Uploading "${file.name}" to "${targetPath}" (full path: ${fullPath})`
-  );
-
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "/";
-      const nodeIndex = mockFileSystem[parentPath]?.findIndex(
-        (node) => node.path === oldPath
-      );
-
       if (
         nodeIndex === undefined ||
         nodeIndex === -1 ||
