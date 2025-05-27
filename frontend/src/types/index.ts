@@ -1,50 +1,47 @@
-// src/types/index.ts
-
 /**
- * Represents a user account in the system.
+ * Represents a user account in the system, aligning with backend UserDetailsSerializer.
  */
 export interface User {
-  id: number | string; // Unique identifier (could be number or UUID string)
-  username: string;
-  email?: string; // Optional email address
-  // Add other relevant user fields later (e.g., name)
+  id: number | string;
+  email: string;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 /**
  * Represents a node in the file system (can be a file or a directory).
  */
 export interface FileNode {
-  id: string; // Unique identifier for the node (e.g., UUID)
-  name: string; // Name of the file or directory
-  is_directory: boolean; // True if it's a directory, false if it's a file
-  path: string; // Logical path within the user's structure (e.g., "/documents/report.txt")
-  size?: number; // Size in bytes (for files)
-  mime_type?: string; // MIME type (for files, e.g., "text/plain", "image/jpeg")
-  owner_username?: string; // Username of the owner
-  is_public?: boolean; // True if the node is publicly accessible
-  created_at: string; // ISO 8601 date string
-  updated_at: string; // ISO 8601 date string
-  // Permissions specific to the *requesting* user might be added by the backend later
-  // e.g., permissions?: 'view' | 'edit' | 'own';
+  id: string;
+  name: string;
+  is_directory: boolean;
+  path: string;
+  size?: number;
+  mime_type?: string;
+  owner_username?: string; // Username of the owner, if provided by backend for listings
+  created_at: string;
+  updated_at: string;
+  is_public?: boolean; // Indicates if the item itself is public or part of a public context
+  is_public_root?: boolean; // Specific to a folder being the user's designated public page root
 }
 
 /**
  * Represents sharing permission granted on a FileNode.
  */
 export interface SharePermission {
-  id: string; // Unique ID for the permission entry
-  node_id: string; // ID of the FileNode being shared
-  shared_with_username: string; // Username of the user it's shared with
-  permission_level: "view" | "edit"; // Type of permission granted
-  granted_by_username: string; // Username of the user who granted the permission
-  created_at: string; // ISO 8601 date string
+  id: string;
+  node_id: string;
+  shared_with_username: string;
+  permission_level: "view" | "edit";
+  granted_by_username: string;
+  created_at: string;
 }
 
 /**
  * Standard structure for API error responses.
  */
 export interface ApiError {
-  message: string; // User-friendly error message
-  detail?: string | Record<string, unknown>; // More specific details (optional)
-  statusCode?: number; // HTTP status code (optional)
+  message: string;
+  detail?: string | Record<string, any>;
+  statusCode?: number;
 }

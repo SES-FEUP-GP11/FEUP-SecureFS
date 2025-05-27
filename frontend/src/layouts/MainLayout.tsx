@@ -1,36 +1,41 @@
 import React, { ReactNode } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom"; // Added useLocation
+import { Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { LogOut, Files, Share2, Settings, TerminalSquare } from "lucide-react"; // Added TerminalSquare
+import { LogOut, Files, Share2, Settings, TerminalSquare } from "lucide-react";
 
 interface MainLayoutProps {
-  children?: ReactNode;
+  children?: ReactNode; // React.FC implicitly includes children, but explicit for clarity if preferred
 }
 
-const MainLayout: React.FC<MainLayoutProps> = (props) => {
+const MainLayout: React.FC<MainLayoutProps> = () => {
   const { user, logout, isLoading: isAuthLoading } = useAuth();
-  const location = useLocation(); // Get current location
+  const location = useLocation();
 
   const handleLogout = async () => {
     try {
       await logout();
-      console.log("MainLayout: Logout initiated successfully.");
+      // Navigation to login page is handled by PrivateRoute upon auth state change
     } catch (error) {
       console.error("MainLayout: Error during logout:", error);
+      // Consider showing a user-facing notification for logout failure
     }
   };
 
-  console.log("[MainLayout] Rendering component...");
-
-  // Helper to determine if a nav link is active
   const isNavLinkActive = (path: string) => {
-    return location.pathname.startsWith(path);
+    if (path === "/files" && location.pathname === "/files") return true;
+    if (path !== "/files" && location.pathname.startsWith(path)) return true;
+    if (path === "/files" && location.pathname.startsWith("/files/"))
+      return true;
+    return false;
   };
+
+  // Determine the best name to display for the user
+  const displayName = user?.first_name || user?.email || "User";
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg hidden md:flex md:flex-col">
+      <aside className="w-64 bg-white shadow-lg hidden md:flex md:flex-col">
         <div className="p-5 border-b h-16 flex items-center">
           <h2 className="text-xl font-bold text-gray-800">FEUP SecureFS</h2>
         </div>
@@ -53,7 +58,7 @@ const MainLayout: React.FC<MainLayoutProps> = (props) => {
             My Files
           </Link>
           <Link
-            to="/shell" // ADDED Link to Shell
+            to="/shell"
             className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md hover:text-indigo-700 hover:bg-indigo-50 ${
               isNavLinkActive("/shell")
                 ? "bg-indigo-100 text-indigo-700"
@@ -70,7 +75,7 @@ const MainLayout: React.FC<MainLayoutProps> = (props) => {
             Shell
           </Link>
           <Link
-            to="/shared" // Assuming a future route
+            to="/shared" // Placeholder for future shared files page
             className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md hover:text-indigo-700 hover:bg-indigo-50 ${
               isNavLinkActive("/shared")
                 ? "bg-indigo-100 text-indigo-700"
@@ -87,7 +92,7 @@ const MainLayout: React.FC<MainLayoutProps> = (props) => {
             Shared with me
           </Link>
           <Link
-            to="/settings" // Assuming a future route
+            to="/settings" // Placeholder for future settings page
             className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md hover:text-indigo-700 hover:bg-indigo-50 ${
               isNavLinkActive("/settings")
                 ? "bg-indigo-100 text-indigo-700"
@@ -104,7 +109,7 @@ const MainLayout: React.FC<MainLayoutProps> = (props) => {
             Settings
           </Link>
         </nav>
-      </div>
+      </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -113,6 +118,7 @@ const MainLayout: React.FC<MainLayoutProps> = (props) => {
           <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div>
               <span className="text-gray-600"></span>
+              {/* Placeholder for breadcrumbs or page title */}
             </div>
             <div className="flex items-center space-x-4">
               {isAuthLoading ? (
@@ -120,7 +126,7 @@ const MainLayout: React.FC<MainLayoutProps> = (props) => {
               ) : user ? (
                 <>
                   <span className="text-sm font-medium text-gray-700 hidden sm:block">
-                    Welcome, {user.username}!
+                    Welcome, {displayName}!
                   </span>
                   <button
                     onClick={handleLogout}
@@ -132,15 +138,14 @@ const MainLayout: React.FC<MainLayoutProps> = (props) => {
                   </button>
                 </>
               ) : (
-                <span className="text-sm text-red-500">Not logged in</span>
+                <span className="text-sm text-red-500">Not logged in</span> // Should ideally not be seen if PrivateRoute works
               )}
             </div>
           </div>
         </header>
 
-        {/* Page Content */}
+        {/* Page Content rendered by React Router */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
-          {console.log("[MainLayout] Rendering Outlet...")}
           <Outlet />
         </main>
       </div>
