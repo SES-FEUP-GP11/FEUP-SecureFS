@@ -18,15 +18,14 @@ from rest_framework.response import Response
 from .models import FileSystemNode
 from .serializers import FileSystemNodeSerializer
 
-_SEGMENT_RE = re.compile(r"^[^\s/]{1,255}$")
-_FILENAME_RE = re.compile(r"^[\w.\- ]{1,255}$")
+_NAME_RE = re.compile(r"^[\w.\- ]{1,255}$")
 
 
 def get_node_by_path(path: str, user):
     segments = [seg for seg in path.strip().split("/") if seg]
 
     for seg in segments:
-        if not _SEGMENT_RE.fullmatch(seg):
+        if not _NAME_RE.fullmatch(seg):
             raise ValueError(f"Invalid path segment")
 
     node = None
