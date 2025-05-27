@@ -8,15 +8,17 @@ import React, {
 } from "react";
 import type { User, ApiError } from "../types";
 import * as authService from "../services/authService";
+import { tokenService } from "../services/tokenService"; // Import tokenService
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
+  isLoading: boolean; // True during login process or initial auth check
+  isAuthenticating: boolean; // True only during initial auth check or token refresh attempt
   error: ApiError | null;
-  login: (username?: string, password?: string) => Promise<void>;
+  login: (email?: string, password?: string) => Promise<void>; // Changed username to email
   logout: () => Promise<void>;
-  checkAuthStatus: () => Promise<void>;
+  // checkAuthStatus: () => Promise<void>; // We'll call fetchUserDetails directly on mount
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -29,107 +31,110 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Initial auth check is loading
+  const [isLoading, setIsLoading] = useState<boolean>(false); // For login/logout operations
+  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(true); // For initial load/token check
   const [error, setError] = useState<ApiError | null>(null);
 
-  // --- ADDED LOG: Track AuthProvider re-renders and its current state ---
   console.log(
     "[AuthProvider] Instance evaluating. User:",
     user,
     "IsLoading:",
     isLoading,
-    "Error:",
-    error
+    "IsAuthenticating:",
+    isAuthenticating
   );
 
-  // --- ADDED LOG: Track user state changes ---
   useEffect(() => {
     console.log("[AuthContext] User state DID CHANGE to:", user);
   }, [user]);
-
-  // --- ADDED LOG: Track isLoading state changes ---
   useEffect(() => {
     console.log("[AuthContext] isLoading state DID CHANGE to:", isLoading);
   }, [isLoading]);
+  useEffect(() => {
+    console.log(
+      "[AuthContext] isAuthenticating state DID CHANGE to:",
+      isAuthenticating
+    );
+  }, [isAuthenticating]);
 
-  const checkAuthStatus = useCallback(async () => {
-    console.log("[AuthProvider] checkAuthStatus called.");
-    setIsLoading(true); // Set loading true for the duration of the check
+  const fetchUserDetails = useCallback(async () => {
+    console.log("[AuthProvider] fetchUserDetails called.");
+    if (!tokenService.getAccessToken()) {
+      console.log(
+        "[AuthProvider] fetchUserDetails: No access token, skipping user fetch."
+      );
+      setUser(null);
+      setIsAuthenticating(false);
+      return;
+    }
+    setIsAuthenticating(true); // Indicate we are trying to authenticate with a token
     setError(null);
     try {
-      // SIMULATION: On initial load, user is not logged in.
-      // This function should ideally only run once on app mount.
-      // If 'user' state is already populated, this simulation shouldn't clear it.
-      // However, for a strict initial check, we start with no user.
-      // This was identified as problematic if checkAuthStatus runs again later.
-      // For now, let's keep it as is to see if it's being called unexpectedly.
-      if (user === null) {
-        // Only set user to null if it's already null (initial state)
-        console.log(
-          "[AuthProvider] checkAuthStatus: No user found, ensuring user is null."
-        );
-      } else {
-        console.log(
-          "[AuthProvider] checkAuthStatus: User already exists, not changing user state."
-        );
-      }
-      // setUser(null); // Previous problematic line
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser);
       console.log(
-        "[AuthProvider] checkAuthStatus: Current simulated outcome - user remains as is or null if initial."
+        "[AuthProvider] fetchUserDetails: User details fetched successfully."
       );
     } catch (err) {
       console.error(
-        "[AuthProvider] checkAuthStatus: Simulated error (should not happen in this sim)",
+        "[AuthProvider] fetchUserDetails: Failed to fetch user details.",
         err
       );
-      setUser(null); // On error, ensure user is null
+      setUser(null); // Ensure user is null if fetching details fails (e.g., token expired)
+      tokenService.clearTokens(); // Clear tokens if they are invalid
     } finally {
-      setIsLoading(false); // Done with initial check
-      console.log(
-        "[AuthProvider] checkAuthStatus: Finished, isLoading set to false."
-      );
-    }
-  }, [user]); // Added user to dependency to re-evaluate if it changes, though checkAuthStatus is for initial
-
-  useEffect(() => {
-    console.log("[AuthProvider] Mount effect: Calling checkAuthStatus.");
-    checkAuthStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // IMPORTANT: Keep this dependency array empty to ensure it runs only once on mount
-
-  const login = useCallback(async (username?: string, password?: string) => {
-    console.log("[AuthProvider] login called.");
-    setIsLoading(true);
-    setError(null);
-    try {
-      const loggedInUser = await authService.login(username, password);
-      setUser(loggedInUser); // This will trigger the user state change log
-      console.log("[AuthProvider] login: Success.");
-    } catch (err) {
-      console.error("[AuthProvider] login: Failed.", err);
-      setError(err as ApiError);
-      setUser(null); // Ensure user is null on login failure
-      throw err;
-    } finally {
-      setIsLoading(false); // This will trigger the isLoading state change log
-      console.log("[AuthProvider] login: Finished, isLoading set to false.");
+      setIsAuthenticating(false);
     }
   }, []);
+
+  // On initial mount, try to fetch user details if tokens exist
+  useEffect(() => {
+    console.log("[AuthProvider] Mount effect: Calling fetchUserDetails.");
+    fetchUserDetails();
+  }, [fetchUserDetails]);
+
+  // Login function now accepts email
+  const login = useCallback(
+    async (email?: string, password?: string) => {
+      console.log("[AuthProvider] login called with email:", email);
+      setIsLoading(true); // For the login operation itself
+      setError(null);
+      try {
+        await authService.login(email, password); // This now stores tokens via tokenService
+        // After tokens are stored, fetch user details
+        await fetchUserDetails(); // This will set the user and isAuthenticating to false
+        console.log(
+          "[AuthProvider] login process: Success (tokens stored, user details fetched)."
+        );
+      } catch (err) {
+        console.error("[AuthProvider] login process: Failed.", err);
+        setError(err as ApiError);
+        setUser(null);
+        tokenService.clearTokens(); // Clear any potentially stored tokens on login failure
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [fetchUserDetails]
+  ); // fetchUserDetails is stable due to its own useCallback
 
   const logout = useCallback(async () => {
     console.log("[AuthProvider] logout called.");
     setIsLoading(true);
     setError(null);
     try {
-      await authService.logout();
-      setUser(null); // This will trigger the user state change log
+      await authService.logout(); // This clears tokens via tokenService
+      setUser(null);
       console.log("[AuthProvider] logout: Success.");
     } catch (err) {
       console.error("[AuthProvider] logout: Failed.", err);
       setError(err as ApiError);
+      // Still clear user and tokens from frontend even if backend call fails
+      setUser(null);
+      tokenService.clearTokens();
     } finally {
-      setIsLoading(false); // This will trigger the isLoading state change log
-      console.log("[AuthProvider] logout: Finished, isLoading set to false.");
+      setIsLoading(false);
     }
   }, []);
 
@@ -138,18 +143,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       "[AuthContext] useMemo for contextValue re-evaluating. User:",
       user,
       "IsLoading:",
-      isLoading
+      isLoading,
+      "IsAuthenticating:",
+      isAuthenticating
     );
     return {
       user,
       isAuthenticated: !!user,
-      isLoading,
+      isLoading, // For general operations like login/logout button state
+      isAuthenticating, // Specifically for initial load/token validation state
       error,
       login,
       logout,
-      checkAuthStatus, // Though it's mainly for initial, provide it
     };
-  }, [user, isLoading, error, login, logout, checkAuthStatus]);
+  }, [user, isLoading, isAuthenticating, error, login, logout]);
 
   return (
     <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
