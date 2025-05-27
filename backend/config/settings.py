@@ -1,10 +1,18 @@
-from datetime import timedelta
 import os
+from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+SECURE_USER_FILES_STORAGE_BASE = os.path.join(BASE_DIR, "..", "user_files_storage")
 
+if not os.path.exists(SECURE_USER_FILES_STORAGE_BASE):
+    os.makedirs(SECURE_USER_FILES_STORAGE_BASE, exist_ok=True)
+
+#  Default max upload sizes
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5MB
+
+ALLOWED_UPLOAD_MIME_TYPES = ["image/jpeg", "image/png", "application/pdf", "text/plain"]
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -77,6 +85,8 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(hours=12),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": False,
 }
 
 # Database

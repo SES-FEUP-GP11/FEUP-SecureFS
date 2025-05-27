@@ -1,7 +1,8 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import models
 
 
 class FileSystemNode(models.Model):
@@ -13,7 +14,9 @@ class FileSystemNode(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="owned_nodes"
     )
-    parent = models.ForeignKey("self", null=True, on_delete=models.CASCADE, related_name="children")
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.CASCADE, related_name="children"
+    )
 
     name = models.CharField(max_length=255)
     is_directory = models.BooleanField(default=False)

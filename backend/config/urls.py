@@ -5,10 +5,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # Authentication endpoints
     path("api/auth/", include("authentication.urls")),
-    # # Files
-    # path("api/files/", include("files.urls")),
-    # # Sharing
-    # path("api/sharing/", include("sharing.urls")),
-    # # Public pages (you could move this into its own app if you prefer)
-    # path('public/<str:username>/', include('config.public_urls')),
+    # Files
+    path("api/files/", include("files.urls")),
 ]
