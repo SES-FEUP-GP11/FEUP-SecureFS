@@ -1,9 +1,12 @@
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 
-from . import views
+from sharing.views import SharePermissionViewSet
+
+router = DefaultRouter()
+
+router.register(r"", SharePermissionViewSet, basename="sharing")
 
 urlpatterns = [
-    # path('',      views.CreateShareView.as_view(),   name='create_share'),
-    # path('',      views.DeleteShareView.as_view(),   name='delete_share'),
-    # path('',      views.ListSharesView.as_view(),    name='list_shares'),
+    path("", include(router.urls)),
 ]
