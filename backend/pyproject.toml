@@ -12,6 +12,7 @@ dependencies = [
     "isort>=6.0.1",
     "pre-commit>=4.2.0",
     "psycopg2-binary>=2.9.10",
+    "python-magic>=0.4.27",
 ]
 
 [tool.black]

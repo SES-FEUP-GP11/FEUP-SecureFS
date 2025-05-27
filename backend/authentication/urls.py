@@ -1,10 +1,10 @@
 # authentication/urls.py
 from django.urls import path
 from rest_framework_simplejwt.views import (
+    TokenBlacklistView,
     TokenObtainPairView,
     TokenRefreshView,
     TokenVerifyView,
-    TokenBlacklistView,
 )
 
 from .views import UserDetailsView

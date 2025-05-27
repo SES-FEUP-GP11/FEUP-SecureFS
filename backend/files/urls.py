@@ -1,12 +1,16 @@
-from django.urls import path
-from . import views
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+
+from .views import FileSystemNodeViewSet
+
+router = DefaultRouter()
+
+router.register(
+    r"",
+    FileSystemNodeViewSet,
+    basename="files",
+)
 
 urlpatterns = [
-    # path('',          views.ListFilesView.as_view(),    name='list_files'),
-    # path('mkdir/',    views.CreateFolderView.as_view(), name='create_folder'),
-    # path('rename/',   views.RenameNodeView.as_view(),   name='rename_node'),
-    # path('upload/',   views.UploadFileView.as_view(),   name='upload_file'),
-    # path('download/', views.DownloadFileView.as_view(), name='download_file'),
-    # path('',          views.DeleteNodeView.as_view(),   name='delete_node'),
-    # path('shell/command/', views.ShellCommandView.as_view(), name='shell_command'),
+    path("", include(router.urls)),
 ]
