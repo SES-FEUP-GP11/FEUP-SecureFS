@@ -1,5 +1,5 @@
 /**
- * Represents a user account in the system, aligning with backend UserDetailsSerializer.
+ * Represents a user account in the system.
  */
 export interface User {
   id: number | string;
@@ -10,19 +10,24 @@ export interface User {
 
 /**
  * Represents a node in the file system (can be a file or a directory).
+ * Aligned with the backend response structure for /api/files/ endpoint.
  */
 export interface FileNode {
-  id: string;
-  name: string;
+  id: string;                 // UUID from backend
+  name: string;               // Filename or folder name
   is_directory: boolean;
-  path: string;
-  size?: number;
-  mime_type?: string;
-  owner_username?: string; // Username of the owner, if provided by backend for listings
-  created_at: string;
-  updated_at: string;
-  is_public?: boolean; // Indicates if the item itself is public or part of a public context
-  is_public_root?: boolean; // Specific to a folder being the user's designated public page root
+  logical_path: string;       // Full logical path from user's root, e.g., "/Documents/report.txt"
+  size_bytes?: number | null;  // Size in bytes, null for directories
+  mime_type?: string | null;   // MIME type for files, null for directories
+  is_public_root?: boolean;    // True if this folder is the root of the user's public page
+  created_at: string;         // ISO 8601 datetime string
+  updated_at: string;         // ISO 8601 datetime string
+  
+  // Optional fields that your frontend simulation used,
+  // include them if your backend serializer for listFiles will provide them.
+  owner_username?: string; 
+  is_public?: boolean;      // This can be derived client-side based on logical_path,
+                            // is_public_root, or explicitly provided by backend.
 }
 
 /**
@@ -41,7 +46,7 @@ export interface SharePermission {
  * Standard structure for API error responses.
  */
 export interface ApiError {
-  message: string;
-  detail?: string | Record<string, any>;
+  message: string; 
+  detail?: string | Record<string, any>; 
   statusCode?: number;
 }
