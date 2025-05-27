@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import type { ApiError, FileNode } from "../types"; // Ensure this uses the updated FileNode
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
+import type { ApiError, FileNode } from "../types";
 import {
   createFolder as createFolderService,
   deleteNode as deleteNodeService,
-  listFiles, // This will now be the API-connected version
+  listFiles,
   renameNode as renameNodeService,
   uploadFile as uploadFileService,
 } from "../services/fileService";
@@ -41,12 +41,28 @@ type AccessSettings = {
   }>;
 };
 
+// Define the expected structure for location state
+interface FilesPageLocationState {
+  currentFolderId?: string | null; // ID of the folder being navigated into
+}
+
 const FilesPage: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams();
+  const location = useLocation(); // Get location object to access state
 
   const splatPath = params["*"] || "";
-  const currentDirectoryPath = `/${splatPath}`; // This is the logical path like "/", "/Docs", "/public/assets"
+  const currentDirectoryPath = `/${splatPath}`; // Logical path for the current view
+
+  // Get currentFolderId from navigation state. This is the ID of the currentDirectoryPath.
+  // It's null if at the root or if state wasn't passed (e.g., direct URL, some breadcrumb clicks).
+  const locationState = location.state as FilesPageLocationState | null;
+  const currentDirectoryNodeId = locationState?.currentFolderId || null;
+
+  console.log(
+    `[FilesPage] Rendering. currentDirectoryPath: "${currentDirectoryPath}", currentDirectoryNodeId (from location.state):`,
+    currentDirectoryNodeId
+  );
 
   const [files, setFiles] = useState<FileNode[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -66,19 +82,14 @@ const FilesPage: React.FC = () => {
 
   const fetchFiles = useCallback(async () => {
     let servicePath = currentDirectoryPath;
-    // Normalize path for service: remove trailing slash unless it's the root '/'
     if (servicePath !== "/" && servicePath.endsWith("/")) {
       servicePath = servicePath.slice(0, -1);
     }
-    console.log(`FilesPage: Fetching files for servicePath: ${servicePath}`);
     setIsLoading(true);
     setError(null);
     try {
-      // Determine if we are in a public Browse context based on the window.location
-      // This context is passed to listFiles, which then uses it for the API call.
-      const isBrowsePublic = window.location.pathname.startsWith("/public");
-
-      const fetchedFiles = await listFiles(servicePath, isBrowsePublic);
+      const isBrowsingPublic = window.location.pathname.startsWith("/public");
+      const fetchedFiles = await listFiles(servicePath, isBrowsingPublic);
       setFiles(fetchedFiles);
     } catch (err) {
       setError(err as ApiError);
@@ -95,28 +106,30 @@ const FilesPage: React.FC = () => {
     if (event && (event.target as HTMLElement).closest(".context-menu-button"))
       return;
     if (item.is_directory) {
-      // item.logical_path is the full logical path of the item itself (e.g., /Docs, /public/assets)
-      // The browser URL needs to be prefixed with /files or /public
       const baseNavPath = window.location.pathname.startsWith("/public")
         ? "/public"
         : "/files";
       const navigateTo = `${baseNavPath}${item.logical_path}`;
-
-      navigate(navigateTo.replace(/\/\//g, "/")); // Replace double slashes, ensure single leading slash
+      // Pass the ID of the folder being navigated into as state
+      // This ID will be used as the parentId if creating a new folder inside it.
+      navigate(navigateTo.replace(/\/\//g, "/"), {
+        state: { currentFolderId: item.id },
+      });
     } else {
       console.log(`FilesPage: Clicked on file: ${item.logical_path}`);
     }
   };
 
   const handleCreateFolder = async (folderName: string) => {
-    let servicePath = currentDirectoryPath;
-    if (servicePath !== "/" && servicePath.endsWith("/"))
-      servicePath = servicePath.slice(0, -1);
+    // Use currentDirectoryNodeId (which is parent's ID, or null for root)
+    console.log(
+      `FilesPage: Attempting to create folder "${folderName}" under parent ID: ${currentDirectoryNodeId}`
+    );
     try {
-      await createFolderService(servicePath, folderName);
+      await createFolderService(folderName, currentDirectoryNodeId);
       await fetchFiles();
     } catch (err) {
-      console.error(`FilesPage: Failed to create folder`, err);
+      console.error(`FilesPage: Failed to create folder "${folderName}"`, err);
       throw err;
     }
   };
@@ -146,6 +159,7 @@ const FilesPage: React.FC = () => {
   };
 
   const handleUploadFile = async (file: File, targetPath: string) => {
+    // targetPath for uploadFileService is the logical path of the parent directory
     let serviceTargetPath = targetPath;
     if (serviceTargetPath !== "/" && serviceTargetPath.endsWith("/"))
       serviceTargetPath = serviceTargetPath.slice(0, -1);
@@ -209,7 +223,6 @@ const FilesPage: React.FC = () => {
 
   const isInPublicFolder = currentDirectoryPath.startsWith("/public");
 
-  // --- Render Logic ---
   if (isLoading && files.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -322,7 +335,6 @@ const FilesPage: React.FC = () => {
                   ) : (
                     <FileIcon className="h-5 w-5 mr-3 text-gray-500 shrink-0" />
                   )}
-                  {/* Use derived or direct is_public flag from FileNode for icon */}
                   {file.is_public ||
                   file.logical_path.startsWith("/public/") ? (
                     <Globe
@@ -340,7 +352,6 @@ const FilesPage: React.FC = () => {
                   <span className="text-gray-800 truncate font-medium text-sm block">
                     {file.name}
                   </span>
-                  {/* Displaying the generic public folder message only if it's the public root itself in non-public view */}
                   {file.logical_path === "/public" &&
                     !isInPublicFolder &&
                     !file.is_directory && (
