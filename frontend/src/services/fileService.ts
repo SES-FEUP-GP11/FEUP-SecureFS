@@ -1,25 +1,28 @@
 import type { FileNode, ApiError } from "../types";
 import apiClient from "./apiClient";
 
-// --- Mock File System Data (FOR SIMULATION ONLY) ---
-// This data will be replaced by actual backend responses.
-const mockFileSystem: Record<string, FileNode[]> = {
+// --- Mock File System Data (FOR SIMULATION of non-listFiles operations ONLY) ---
+// This is the version you provided earlier.
+const mockFileSystem_for_simulations: Record<string, FileNode[]> = {
   "/": [
     {
       id: "sim-folder-public",
       name: "public",
       is_directory: true,
       path: "/public",
+      logical_path: "/public",
       owner_username: "testuser",
-      is_public: true, // Mark as public folder
+      is_public: true,
       created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
       updated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+      is_public_root: true,
     },
     {
       id: "sim-folder-docs",
       name: "Docs",
       is_directory: true,
       path: "/Docs",
+      logical_path: "/Docs",
       owner_username: "testuser",
       created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
       updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
@@ -29,6 +32,7 @@ const mockFileSystem: Record<string, FileNode[]> = {
       name: "Pictures",
       is_directory: true,
       path: "/Pictures",
+      logical_path: "/Pictures",
       owner_username: "testuser",
       created_at: new Date(Date.now() - 172800000).toISOString(),
       updated_at: new Date(Date.now() - 172800000).toISOString(),
@@ -38,21 +42,22 @@ const mockFileSystem: Record<string, FileNode[]> = {
       name: "report.txt",
       is_directory: false,
       path: "/report.txt",
-      size: 1024,
+      logical_path: "/report.txt",
+      size_bytes: 1024,
       mime_type: "text/plain",
       owner_username: "testuser",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
   ],
-  // Public folder contents for testuser
   "/public": [
     {
       id: "sim-file-public-readme",
       name: "README.md",
       is_directory: false,
       path: "/public/README.md",
-      size: 2048,
+      logical_path: "/public/README.md",
+      size_bytes: 2048,
       mime_type: "text/markdown",
       owner_username: "testuser",
       is_public: true,
@@ -64,7 +69,8 @@ const mockFileSystem: Record<string, FileNode[]> = {
       name: "portfolio.html",
       is_directory: false,
       path: "/public/portfolio.html",
-      size: 5120,
+      logical_path: "/public/portfolio.html",
+      size_bytes: 5120,
       mime_type: "text/html",
       owner_username: "testuser",
       is_public: true,
@@ -76,20 +82,22 @@ const mockFileSystem: Record<string, FileNode[]> = {
       name: "assets",
       is_directory: true,
       path: "/public/assets",
+      logical_path: "/public/assets",
       owner_username: "testuser",
       is_public: true,
       created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
       updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+      is_public_root: false,
     },
   ],
-
   "/public/assets": [
     {
       id: "sim-file-public-logo",
       name: "logo.png",
       is_directory: false,
       path: "/public/assets/logo.png",
-      size: 10240,
+      logical_path: "/public/assets/logo.png",
+      size_bytes: 10240,
       mime_type: "image/png",
       owner_username: "testuser",
       is_public: true,
@@ -103,7 +111,8 @@ const mockFileSystem: Record<string, FileNode[]> = {
       name: "project_plan.docx",
       is_directory: false,
       path: "/Docs/project_plan.docx",
-      size: 51200,
+      logical_path: "/Docs/project_plan.docx",
+      size_bytes: 51200,
       mime_type:
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       owner_username: "testuser",
@@ -115,6 +124,7 @@ const mockFileSystem: Record<string, FileNode[]> = {
       name: "Archive",
       is_directory: true,
       path: "/Docs/Archive",
+      logical_path: "/Docs/Archive",
       owner_username: "testuser",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -124,6 +134,7 @@ const mockFileSystem: Record<string, FileNode[]> = {
       name: "Test",
       is_directory: true,
       path: "/Docs/Test",
+      logical_path: "/Docs/Test",
       owner_username: "testuser",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -135,7 +146,8 @@ const mockFileSystem: Record<string, FileNode[]> = {
       name: "subtest.txt",
       is_directory: false,
       path: "/Docs/Test/subtest.txt",
-      size: 50,
+      logical_path: "/Docs/Test/subtest.txt",
+      size_bytes: 50,
       mime_type: "text/plain",
       owner_username: "testuser",
       created_at: new Date().toISOString(),
@@ -148,103 +160,137 @@ const mockFileSystem: Record<string, FileNode[]> = {
       name: "vacation.jpg",
       is_directory: false,
       path: "/Pictures/vacation.jpg",
-      size: 204800,
+      logical_path: "/Pictures/vacation.jpg",
+      size_bytes: 204800,
       mime_type: "image/jpeg",
       owner_username: "testuser",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
   ],
-  "/Docs/Archive": [], // Empty directory
+  "/Docs/Archive": [],
 };
-// --- END SIMULATION DATA ---
+// --- END SIMULATION DATA for other functions ---
 
-// Helper function for renameNode simulation to recursively update paths
-const recursivelyUpdatePathsAndMoveChildren = (
+const recursivelyUpdatePathsAndMoveChildren_sim = (
   oldDirKey: string,
   newDirKey: string
 ) => {
-  if (!mockFileSystem.hasOwnProperty(oldDirKey)) {
-    return; // Source directory doesn't exist in mock, nothing to do
-  }
-
-  const childrenToMove = mockFileSystem[oldDirKey]!;
-  delete mockFileSystem[oldDirKey]; // Remove old directory entry
-
-  mockFileSystem[newDirKey] = []; // Create new directory entry
-
+  if (!mockFileSystem_for_simulations.hasOwnProperty(oldDirKey)) return;
+  const childrenToMove = mockFileSystem_for_simulations[oldDirKey]!;
+  delete mockFileSystem_for_simulations[oldDirKey];
+  mockFileSystem_for_simulations[newDirKey] = [];
   for (const child of childrenToMove) {
-    const oldChildPath = child.path;
-    // Replace only the beginning of the path that matches oldDirKey
+    const oldChildPath = child.logical_path; // Use logical_path for consistency
     const newChildPath = oldChildPath.startsWith(oldDirKey + "/")
       ? newDirKey + oldChildPath.substring(oldDirKey.length)
-      : newDirKey + "/" + child.name; // Fallback for direct children if path was just oldDirKey
-
-    const updatedChild = { ...child, path: newChildPath };
-    mockFileSystem[newDirKey].push(updatedChild);
-
+      : newDirKey + "/" + child.name;
+    const updatedChild = {
+      ...child,
+      path: newChildPath,
+      logical_path: newChildPath,
+    };
+    mockFileSystem_for_simulations[newDirKey].push(updatedChild);
     if (updatedChild.is_directory) {
-      // Recursively call for subdirectories, using their original old path and new path
-      recursivelyUpdatePathsAndMoveChildren(oldChildPath, newChildPath);
+      recursivelyUpdatePathsAndMoveChildren_sim(oldChildPath, newChildPath);
     }
   }
-  console.log(
-    `[SIMULATION Helper] Moved children from ${oldDirKey} to ${newDirKey} and updated paths.`
-  );
 };
 
+/**
+ * Fetches the list of files and folders for a given path from the backend.
+ */
 export const listFiles = async (
   path: string,
-  isPublicContext: boolean = false
+  isPublicContext: boolean = false // Used by FilesPage to indicate context
 ): Promise<FileNode[]> => {
+  const requestPath = path || "/"; // Ensure path is at least "/" for the service call
   console.log(
-    `[SIMULATION] listFiles for path: ${path}${
+    `[API] listFiles for path: ${requestPath}${
       isPublicContext ? " (Public Context)" : ""
     }`
   );
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const normalizedPath = path || "/";
-      if (mockFileSystem.hasOwnProperty(normalizedPath)) {
-        const items = isPublicContext
-          ? mockFileSystem[normalizedPath]!.filter(
-              (item) => item.is_public || item.path.startsWith("/public/")
-            ) // Simplified: check item flag or if under /public
-          : [...mockFileSystem[normalizedPath]!]; // Return a copy for private context
 
-        console.log(
-          `[SIMULATION] listFiles successful for ${normalizedPath}:`,
-          items
-        );
-        resolve(items);
-      } else {
-        const error: ApiError = {
-          message: `Directory not found: ${normalizedPath}`,
-          statusCode: 404,
-        };
-        console.error(
-          `[SIMULATION] listFiles failed for ${normalizedPath}:`,
-          error
-        );
-        reject(error);
-      }
-    }, 300); // Reduced delay for faster testing
-  });
+  const params: { path?: string } = {};
+  // Only add path parameter if it's not the root, as backend defaults to root if param is absent.
+  if (requestPath !== "/") {
+    params.path = requestPath;
+  }
+
+  // Determine the API endpoint.
+  // For now, assume the same '/files/' endpoint is used, and backend distinguishes
+  // public if the path itself indicates it (e.g., starts with '/public')
+  // or if additional query params (not shown here) were used.
+  const endpoint = "/files/";
+
+  try {
+    console.log(
+      `[API] Calling: GET ${apiClient.defaults.baseURL}${endpoint.substring(
+        1
+      )}`,
+      { params }
+    );
+    // Backend is expected to return an array of objects matching FileNode structure.
+    // Fields like 'logical_path' and 'size_bytes' should come from backend.
+    const response = await apiClient.get<FileNode[]>(endpoint, { params });
+
+    console.log(
+      `[API] listFiles successful for ${requestPath}. Received ${response.data.length} items.`
+    );
+    // Map backend response to ensure frontend FileNode structure is met,
+    // especially if there are minor differences or fields to derive client-side.
+    // The updated FileNode type in types/index.ts now uses 'logical_path' and 'size_bytes'.
+    return response.data.map((node) => {
+      // The 'path' property was used in simulation, ensure it's consistent with logical_path
+      // If backend sends 'logical_path', it's already on our FileNode type.
+      // If frontend components specifically use 'path', ensure it's logical_path.
+      // For safety, we can ensure our 'path' is the same as 'logical_path'.
+      const frontendNode: FileNode = {
+        ...node,
+        path: node.logical_path, // Ensure 'path' is always the logical_path for frontend use
+        is_public:
+          node.is_public_root || node.logical_path.startsWith("/public/"), // Example derivation
+      };
+      return frontendNode;
+    });
+  } catch (error: any) {
+    console.error(`[API] listFiles failed for ${requestPath}:`, error);
+    const apiError: ApiError = {
+      message:
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to fetch files.",
+      statusCode: error.response?.status,
+      detail: error.response?.data,
+    };
+    throw apiError;
+  }
 };
 
+/**
+ * Lists public files. This now calls the main listFiles with a flag,
+ * assuming the backend /api/files/ endpoint can differentiate access
+ * or the path itself dictates public visibility.
+ */
 export const listPublicFiles = async (
   path: string = "/"
 ): Promise<FileNode[]> => {
-  console.log(`[SIMULATION] listPublicFiles for path: ${path}`);
-  // For simulation, we can reuse listFiles and ensure it only returns public items.
-  // This assumes listFiles can differentiate or the paths are distinct.
-  // For now, we'll assume path for public files starts with '/public'
-  if (!path.startsWith("/public") && path !== "/") {
-    // If trying to list non-public root as public, treat as root of public
-    return listFiles("/public", true);
+  console.log(`[API] listPublicFiles for path: ${path}`);
+  // The path here should be relative to the public root if that's how backend handles it
+  // e.g. if public root is /public, path "/" here means "/public" to listFiles
+  let effectivePath = path;
+  if (path === "/") {
+    // Root of public files
+    effectivePath = "/public"; // Assuming "/public" is the designated root public folder name
+  } else if (!path.startsWith("/public")) {
+    effectivePath = `/public${path.startsWith("/") ? "" : "/"}${path}`;
   }
-  return listFiles(path, true);
+  return listFiles(effectivePath, true);
 };
+
+// --- SIMULATED FUNCTIONS for other operations ---
+const MOCK_DELAY = 300;
 
 export const createFolder = async (
   parentPath: string,
@@ -254,7 +300,8 @@ export const createFolder = async (
   console.log(`[SIMULATION] createFolder: ${fullPath}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      if (!mockFileSystem[parentPath]) {
+      const mockFS = mockFileSystem_for_simulations;
+      if (!mockFS[parentPath]) {
         reject({
           message: `Parent path not found: ${parentPath}`,
           statusCode: 404,
@@ -262,7 +309,7 @@ export const createFolder = async (
         return;
       }
       if (
-        mockFileSystem[parentPath]?.some(
+        mockFS[parentPath]?.some(
           (node) => node.name === name && node.is_directory
         )
       ) {
@@ -271,51 +318,19 @@ export const createFolder = async (
       }
       const newFolder: FileNode = {
         id: `sim-folder-${Date.now()}`,
-        name: name,
+        name,
         is_directory: true,
         path: fullPath,
+        logical_path: fullPath,
         owner_username: "testuser",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        is_public: parentPath.startsWith("/public"), // Inherit public status if created in public folder
+        is_public: parentPath.startsWith("/public"),
       };
-      mockFileSystem[parentPath]?.push(newFolder);
-      mockFileSystem[fullPath] = [];
-      console.log("[SIMULATION] createFolder successful:", newFolder);
+      mockFS[parentPath] = [...(mockFS[parentPath] || []), newFolder];
+      mockFS[fullPath] = [];
       resolve(newFolder);
-    }, 300);
-  });
-};
-
-export const deleteNode = async (nodePath: string): Promise<void> => {
-  console.log(`[SIMULATION] deleteNode: ${nodePath}`);
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const parentPath =
-        nodePath.substring(0, nodePath.lastIndexOf("/")) || "/";
-      const nodeExistsInParent = mockFileSystem[parentPath]?.some(
-        (node) => node.path === nodePath
-      );
-
-      if (!nodeExistsInParent && !mockFileSystem.hasOwnProperty(nodePath)) {
-        reject({ message: `Node not found: ${nodePath}`, statusCode: 404 });
-        return;
-      }
-      if (mockFileSystem[parentPath]) {
-        mockFileSystem[parentPath] =
-          mockFileSystem[parentPath]?.filter(
-            (node) => node.path !== nodePath
-          ) ?? [];
-      }
-      if (mockFileSystem.hasOwnProperty(nodePath)) {
-        // Basic simulation: if it's a directory, just remove its key.
-        // A real backend would handle recursive deletion of contents.
-        // For a more robust simulation, we might need to recursively delete child keys from mockFileSystem.
-        delete mockFileSystem[nodePath];
-      }
-      console.log("[SIMULATION] deleteNode successful.");
-      resolve();
-    }, 300);
+    }, MOCK_DELAY);
   });
 };
 
@@ -328,65 +343,65 @@ export const renameNode = async (
   );
   return new Promise((resolve, reject) => {
     setTimeout(() => {
+      const mockFS = mockFileSystem_for_simulations;
       const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "/";
-      const nodeIndex = mockFileSystem[parentPath]?.findIndex(
-        (node) => node.path === oldPath
-      );
-
-      if (
-        nodeIndex === undefined ||
-        nodeIndex === -1 ||
-        !mockFileSystem[parentPath]
-      ) {
-        console.error(
-          `[SIMULATION] renameNode: Node not found in parent list: ${oldPath}`
-        );
+      const nodeIndex = mockFS[parentPath]?.findIndex(
+        (node) => node.logical_path === oldPath
+      ); // Use logical_path
+      if (nodeIndex === undefined || nodeIndex === -1 || !mockFS[parentPath]) {
         reject({ message: `Node not found: ${oldPath}`, statusCode: 404 });
         return;
       }
-
-      const itemToUpdate = mockFileSystem[parentPath]![nodeIndex]!;
+      const itemToUpdate = mockFS[parentPath]![nodeIndex]!;
       const newFullPath = `${parentPath === "/" ? "" : parentPath}/${newName}`;
-
       if (
-        mockFileSystem[parentPath]!.some(
-          (node) => node.name === newName && node.path !== oldPath
+        mockFS[parentPath]!.some(
+          (node) => node.name === newName && node.logical_path !== oldPath
         )
       ) {
-        console.error(
-          `[SIMULATION] renameNode: Name conflict for "${newName}" in "${parentPath}"`
-        );
         reject({
-          message: `An item named "${newName}" already exists in this location.`,
+          message: `An item named "${newName}" already exists.`,
           statusCode: 409,
         });
         return;
       }
-
       const updatedItemInParentList: FileNode = {
         ...itemToUpdate,
         name: newName,
         path: newFullPath,
+        logical_path: newFullPath,
         updated_at: new Date().toISOString(),
       };
-      mockFileSystem[parentPath]![nodeIndex] = updatedItemInParentList;
-      console.log(
-        `[SIMULATION] renameNode: Updated item in parent list. New path: ${newFullPath}`
-      );
-
-      if (itemToUpdate.is_directory) {
-        console.log(
-          `[SIMULATION] renameNode: Item is a directory. Old key: ${oldPath}, New key: ${newFullPath}`
-        );
-        recursivelyUpdatePathsAndMoveChildren(oldPath, newFullPath);
-      }
-
-      console.log(
-        "[SIMULATION] renameNode successful, returning:",
-        updatedItemInParentList
-      );
+      mockFS[parentPath]![nodeIndex] = updatedItemInParentList;
+      if (itemToUpdate.is_directory)
+        recursivelyUpdatePathsAndMoveChildren_sim(oldPath, newFullPath);
       resolve(updatedItemInParentList);
-    }, 300);
+    }, MOCK_DELAY);
+  });
+};
+
+export const deleteNode = async (nodePath: string): Promise<void> => {
+  console.log(`[SIMULATION] deleteNode: ${nodePath}`);
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const mockFS = mockFileSystem_for_simulations;
+      const parentPath =
+        nodePath.substring(0, nodePath.lastIndexOf("/")) || "/";
+      const nodeExistsInParent = mockFS[parentPath]?.some(
+        (node) => node.logical_path === nodePath
+      );
+      if (!nodeExistsInParent && !mockFS.hasOwnProperty(nodePath)) {
+        reject({ message: `Node not found: ${nodePath}`, statusCode: 404 });
+        return;
+      }
+      if (mockFS[parentPath])
+        mockFS[parentPath] =
+          mockFS[parentPath]?.filter(
+            (node) => node.logical_path !== nodePath
+          ) ?? [];
+      if (mockFS.hasOwnProperty(nodePath)) delete mockFS[nodePath];
+      resolve();
+    }, MOCK_DELAY);
   });
 };
 
@@ -395,16 +410,11 @@ export const uploadFile = async (
   targetPath: string
 ): Promise<FileNode> => {
   const fullPath = `${targetPath === "/" ? "" : targetPath}/${file.name}`;
-  console.log(
-    `[SIMULATION] uploadFile: Uploading "${file.name}" to "${targetPath}" (full path: ${fullPath})`
-  );
-
+  console.log(`[SIMULATION] uploadFile: "${file.name}" to "${targetPath}"`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      if (!mockFileSystem.hasOwnProperty(targetPath)) {
-        console.error(
-          `[SIMULATION] uploadFile: Target directory "${targetPath}" not found.`
-        );
+      const mockFS = mockFileSystem_for_simulations;
+      if (!mockFS.hasOwnProperty(targetPath)) {
         reject({
           message: `Target directory not found: ${targetPath}`,
           statusCode: 404,
@@ -412,14 +422,11 @@ export const uploadFile = async (
         return;
       }
       if (
-        mockFileSystem[targetPath]?.some(
+        mockFS[targetPath]?.some(
           (node) => node.name === file.name && !node.is_directory
         )
       ) {
-        console.warn(
-          `[SIMULATION] uploadFile: File "${file.name}" already exists in "${targetPath}". Overwriting.`
-        );
-        mockFileSystem[targetPath] = mockFileSystem[targetPath]!.filter(
+        mockFS[targetPath] = mockFS[targetPath]!.filter(
           (node) => node.name !== file.name
         );
       }
@@ -428,15 +435,15 @@ export const uploadFile = async (
         name: file.name,
         is_directory: false,
         path: fullPath,
-        size: file.size,
+        logical_path: fullPath,
+        size_bytes: file.size,
         mime_type: file.type || "application/octet-stream",
         owner_username: "testuser",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        is_public: targetPath.startsWith("/public"), // Inherit public status
+        is_public: targetPath.startsWith("/public"),
       };
-      mockFileSystem[targetPath]?.push(newFileNode);
-      console.log("[SIMULATION] uploadFile successful:", newFileNode);
+      mockFS[targetPath]?.push(newFileNode);
       resolve(newFileNode);
     }, 1200);
   });
@@ -447,7 +454,6 @@ interface ShellCommandResult {
   error: string | null;
   newPath?: string;
 }
-
 export const executeShellCommand = async (
   commandLine: string,
   currentPath: string
@@ -455,29 +461,24 @@ export const executeShellCommand = async (
   console.log(
     `[SIMULATION] executeShellCommand: "${commandLine}" in path "${currentPath}"`
   );
-  const [command, ...args] = commandLine.trim().split(/\s+/);
-
   return new Promise((resolve) => {
     setTimeout(() => {
+      const [command, ...args] = commandLine.trim().split(/\s+/);
       let output: string | null = null;
       let error: string | null = null;
       let newPath: string | undefined = undefined;
-
+      const mockFS = mockFileSystem_for_simulations;
       switch (command.toLowerCase()) {
         case "ls":
-          const targetLsPath = args[0]
-            ? resolvePath(currentPath, args[0])
-            : currentPath;
-          if (mockFileSystem.hasOwnProperty(targetLsPath)) {
-            const items = mockFileSystem[targetLsPath];
-            if (items.length === 0) output = "(empty)";
-            else
-              output = items
-                .map((item) => `${item.name}${item.is_directory ? "/" : ""}`)
-                .join("\n");
-          } else
+          const p = args[0] ? resolvePath(currentPath, args[0]) : currentPath;
+          if (mockFS[p])
+            output =
+              mockFS[p]
+                .map((i) => i.name + (i.is_directory ? "/" : ""))
+                .join("\n") || "(empty)";
+          else
             error = `ls: cannot access '${
-              args[0] || targetLsPath
+              args[0] || p
             }': No such file or directory`;
           break;
         case "cd":
@@ -485,27 +486,14 @@ export const executeShellCommand = async (
             error = "cd: missing operand";
             break;
           }
-          const targetCdPath = resolvePath(currentPath, args[0]);
-          // Check if targetCdPath exists as a key (for directories)
-          // or if it's a path of a directory node in any listing
-          const targetNode = Object.values(mockFileSystem)
+          const np = resolvePath(currentPath, args[0]);
+          const tn = Object.values(mockFS)
             .flat()
-            .find((n) => n.path === targetCdPath);
-          if (targetNode && targetNode.is_directory) {
-            newPath = targetCdPath;
-            // Ensure the newPath also exists as a key in mockFileSystem for 'ls' to work correctly in it
-            if (!mockFileSystem.hasOwnProperty(newPath) && newPath !== "/") {
-              // This case might happen if we cd into a path that's valid but not explicitly a key
-              // For simulation, we might need to ensure such keys exist if they represent directories
-              console.warn(
-                `[SIMULATION] cd: Target path ${newPath} is a directory node but not a direct key in mockFileSystem. 'ls' in this path might fail unless it's a root-level listed dir.`
-              );
-            }
-          } else if (targetNode && !targetNode.is_directory) {
+            .find((n) => n.logical_path === np);
+          if (tn && tn.is_directory) newPath = np;
+          else if (tn && !tn.is_directory)
             error = `cd: ${args[0]}: Not a directory`;
-          } else {
-            error = `cd: ${args[0]}: No such file or directory`;
-          }
+          else error = `cd: ${args[0]}: No such file or directory`;
           break;
         case "pwd":
           output = currentPath;
@@ -515,31 +503,27 @@ export const executeShellCommand = async (
             error = "mkdir: missing operand";
             break;
           }
-          const newDirName = args[0];
-          if (!mockFileSystem.hasOwnProperty(currentPath)) {
-            error = `mkdir: cannot create directory '${newDirName}': Current path '${currentPath}' does not exist`;
+          const dN = args[0];
+          if (!mockFS[currentPath]) {
+            error = `mkdir: cannot create directory '${dN}': Current path '${currentPath}' does not exist`;
             break;
           }
-          const newDirPath = resolvePath(currentPath, newDirName);
-          if (
-            mockFileSystem[currentPath]?.some((n) => n.name === newDirName) ||
-            mockFileSystem.hasOwnProperty(newDirPath)
-          ) {
-            error = `mkdir: cannot create directory '${newDirName}': File exists`;
+          const dP = resolvePath(currentPath, dN);
+          if (mockFS[currentPath]?.some((n) => n.name === dN) || mockFS[dP]) {
+            error = `mkdir: cannot create directory '${dN}': File exists`;
           } else {
-            const newFolder: FileNode = {
-              id: `sim-shell-folder-${Date.now()}`,
-              name: newDirName,
+            const nF: FileNode = {
+              id: `sS${Date.now()}`,
+              name: dN,
               is_directory: true,
-              path: newDirPath,
-              owner_username: "testuser",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              is_public: currentPath.startsWith("/public"),
+              path: dP,
+              logical_path: dP,
+              created_at: "",
+              updated_at: "",
             };
-            mockFileSystem[currentPath]?.push(newFolder);
-            mockFileSystem[newDirPath] = []; // Ensure the new directory itself is a key
-            output = `Directory '${newDirName}' created.`;
+            mockFS[currentPath]?.push(nF);
+            mockFS[dP] = [];
+            output = `Directory '${dN}' created.`;
           }
           break;
         case "help":
@@ -550,30 +534,22 @@ export const executeShellCommand = async (
           error = `${command}: command not found`;
       }
       resolve({ output, error, newPath });
-    }, 500);
+    }, MOCK_DELAY);
   });
 };
 
 const resolvePath = (current: string, target: string): string => {
   if (target.startsWith("/")) {
-    // Absolute path
-    // Normalize: remove trailing slash unless it's the root
     if (target !== "/" && target.endsWith("/")) return target.slice(0, -1);
     return target;
   }
-
-  const currentParts = current.split("/").filter((p) => p); // ['Docs', 'Test'] from '/Docs/Test'
+  const currentParts = current.split("/").filter((p) => p);
   const targetParts = target.split("/").filter((p) => p);
-
   for (const part of targetParts) {
     if (part === "..") {
-      if (currentParts.length > 0) {
-        currentParts.pop();
-      }
-    } else if (part !== "." && part !== "") {
-      currentParts.push(part);
-    }
+      if (currentParts.length > 0) currentParts.pop();
+    } else if (part !== "." && part !== "") currentParts.push(part);
   }
   const resolved = `/${currentParts.join("/")}`;
-  return resolved === "//" ? "/" : resolved || "/"; // Handle empty parts array or double slash at root
+  return resolved === "//" ? "/" : resolved || "/";
 };
