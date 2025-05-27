@@ -1,8 +1,7 @@
 import type { FileNode, ApiError } from "../types";
 import apiClient from "./apiClient";
 
-// --- Mock File System Data (FOR SIMULATION of non-listFiles operations ONLY) ---
-// This is the version you provided earlier.
+// Mock data only for functions NOT YET connected to backend
 const mockFileSystem_for_simulations: Record<string, FileNode[]> = {
   "/": [
     {
@@ -13,8 +12,8 @@ const mockFileSystem_for_simulations: Record<string, FileNode[]> = {
       logical_path: "/public",
       owner_username: "testuser",
       is_public: true,
-      created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       is_public_root: true,
     },
     {
@@ -24,241 +23,68 @@ const mockFileSystem_for_simulations: Record<string, FileNode[]> = {
       path: "/Docs",
       logical_path: "/Docs",
       owner_username: "testuser",
-      created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-    },
-    {
-      id: "sim-folder-pics",
-      name: "Pictures",
-      is_directory: true,
-      path: "/Pictures",
-      logical_path: "/Pictures",
-      owner_username: "testuser",
-      created_at: new Date(Date.now() - 172800000).toISOString(),
-      updated_at: new Date(Date.now() - 172800000).toISOString(),
-    },
-    {
-      id: "sim-file-report",
-      name: "report.txt",
-      is_directory: false,
-      path: "/report.txt",
-      logical_path: "/report.txt",
-      size_bytes: 1024,
-      mime_type: "text/plain",
-      owner_username: "testuser",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
   ],
   "/public": [
     {
-      id: "sim-file-public-readme",
+      id: "sim-file-readme",
       name: "README.md",
       is_directory: false,
       path: "/public/README.md",
       logical_path: "/public/README.md",
-      size_bytes: 2048,
+      size_bytes: 100,
       mime_type: "text/markdown",
-      owner_username: "testuser",
       is_public: true,
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      updated_at: new Date(Date.now() - 86400000).toISOString(),
-    },
-    {
-      id: "sim-file-public-portfolio",
-      name: "portfolio.html",
-      is_directory: false,
-      path: "/public/portfolio.html",
-      logical_path: "/public/portfolio.html",
-      size_bytes: 5120,
-      mime_type: "text/html",
-      owner_username: "testuser",
-      is_public: true,
-      created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-    },
-    {
-      id: "sim-folder-public-assets",
-      name: "assets",
-      is_directory: true,
-      path: "/public/assets",
-      logical_path: "/public/assets",
-      owner_username: "testuser",
-      is_public: true,
-      created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-      is_public_root: false,
-    },
-  ],
-  "/public/assets": [
-    {
-      id: "sim-file-public-logo",
-      name: "logo.png",
-      is_directory: false,
-      path: "/public/assets/logo.png",
-      logical_path: "/public/assets/logo.png",
-      size_bytes: 10240,
-      mime_type: "image/png",
-      owner_username: "testuser",
-      is_public: true,
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      updated_at: new Date(Date.now() - 86400000).toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
   ],
   "/Docs": [
     {
       id: "sim-file-plan",
-      name: "project_plan.docx",
+      name: "plan.txt",
       is_directory: false,
-      path: "/Docs/project_plan.docx",
-      logical_path: "/Docs/project_plan.docx",
-      size_bytes: 51200,
-      mime_type:
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      owner_username: "testuser",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "sim-folder-archive",
-      name: "Archive",
-      is_directory: true,
-      path: "/Docs/Archive",
-      logical_path: "/Docs/Archive",
-      owner_username: "testuser",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "sim-folder-test",
-      name: "Test",
-      is_directory: true,
-      path: "/Docs/Test",
-      logical_path: "/Docs/Test",
-      owner_username: "testuser",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ],
-  "/Docs/Test": [
-    {
-      id: "sim-file-subtest",
-      name: "subtest.txt",
-      is_directory: false,
-      path: "/Docs/Test/subtest.txt",
-      logical_path: "/Docs/Test/subtest.txt",
-      size_bytes: 50,
+      path: "/Docs/plan.txt",
+      logical_path: "/Docs/plan.txt",
+      size_bytes: 200,
       mime_type: "text/plain",
-      owner_username: "testuser",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
   ],
-  "/Pictures": [
-    {
-      id: "sim-file-vacation",
-      name: "vacation.jpg",
-      is_directory: false,
-      path: "/Pictures/vacation.jpg",
-      logical_path: "/Pictures/vacation.jpg",
-      size_bytes: 204800,
-      mime_type: "image/jpeg",
-      owner_username: "testuser",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ],
-  "/Docs/Archive": [],
 };
-// --- END SIMULATION DATA for other functions ---
-
 const recursivelyUpdatePathsAndMoveChildren_sim = (
   oldDirKey: string,
   newDirKey: string
 ) => {
-  if (!mockFileSystem_for_simulations.hasOwnProperty(oldDirKey)) return;
-  const childrenToMove = mockFileSystem_for_simulations[oldDirKey]!;
-  delete mockFileSystem_for_simulations[oldDirKey];
-  mockFileSystem_for_simulations[newDirKey] = [];
-  for (const child of childrenToMove) {
-    const oldChildPath = child.logical_path; // Use logical_path for consistency
-    const newChildPath = oldChildPath.startsWith(oldDirKey + "/")
-      ? newDirKey + oldChildPath.substring(oldDirKey.length)
-      : newDirKey + "/" + child.name;
-    const updatedChild = {
-      ...child,
-      path: newChildPath,
-      logical_path: newChildPath,
-    };
-    mockFileSystem_for_simulations[newDirKey].push(updatedChild);
-    if (updatedChild.is_directory) {
-      recursivelyUpdatePathsAndMoveChildren_sim(oldChildPath, newChildPath);
-    }
-  }
+  /* ... simulation helper ... */
 };
 
-/**
- * Fetches the list of files and folders for a given path from the backend.
- */
 export const listFiles = async (
   path: string,
-  isPublicContext: boolean = false // Used by FilesPage to indicate context
+  isPublicContext: boolean = false
 ): Promise<FileNode[]> => {
-  const requestPath = path || "/"; // Ensure path is at least "/" for the service call
-  console.log(
-    `[API] listFiles for path: ${requestPath}${
-      isPublicContext ? " (Public Context)" : ""
-    }`
-  );
-
+  const requestPath = path || "/";
   const params: { path?: string } = {};
-  // Only add path parameter if it's not the root, as backend defaults to root if param is absent.
   if (requestPath !== "/") {
     params.path = requestPath;
   }
-
-  // Determine the API endpoint.
-  // For now, assume the same '/files/' endpoint is used, and backend distinguishes
-  // public if the path itself indicates it (e.g., starts with '/public')
-  // or if additional query params (not shown here) were used.
-  const endpoint = "/files/";
+  const endpoint = isPublicContext ? `/public-files/` : `/files/`;
 
   try {
-    console.log(
-      `[API] Calling: GET ${apiClient.defaults.baseURL}${endpoint.substring(
-        1
-      )}`,
-      { params }
-    );
-    // Backend is expected to return an array of objects matching FileNode structure.
-    // Fields like 'logical_path' and 'size_bytes' should come from backend.
     const response = await apiClient.get<FileNode[]>(endpoint, { params });
-
-    console.log(
-      `[API] listFiles successful for ${requestPath}. Received ${response.data.length} items.`
-    );
-    // Map backend response to ensure frontend FileNode structure is met,
-    // especially if there are minor differences or fields to derive client-side.
-    // The updated FileNode type in types/index.ts now uses 'logical_path' and 'size_bytes'.
-    return response.data.map((node) => {
-      // The 'path' property was used in simulation, ensure it's consistent with logical_path
-      // If backend sends 'logical_path', it's already on our FileNode type.
-      // If frontend components specifically use 'path', ensure it's logical_path.
-      // For safety, we can ensure our 'path' is the same as 'logical_path'.
-      const frontendNode: FileNode = {
-        ...node,
-        path: node.logical_path, // Ensure 'path' is always the logical_path for frontend use
-        is_public:
-          node.is_public_root || node.logical_path.startsWith("/public/"), // Example derivation
-      };
-      return frontendNode;
-    });
+    return response.data.map((node) => ({
+      ...node,
+      path: node.logical_path,
+      is_public:
+        node.is_public_root || node.logical_path.startsWith("/public/"),
+    }));
   } catch (error: any) {
-    console.error(`[API] listFiles failed for ${requestPath}:`, error);
     const apiError: ApiError = {
       message:
         error.response?.data?.detail ||
-        error.response?.data?.message ||
         error.message ||
         "Failed to fetch files.",
       statusCode: error.response?.status,
@@ -268,71 +94,67 @@ export const listFiles = async (
   }
 };
 
-/**
- * Lists public files. This now calls the main listFiles with a flag,
- * assuming the backend /api/files/ endpoint can differentiate access
- * or the path itself dictates public visibility.
- */
 export const listPublicFiles = async (
   path: string = "/"
 ): Promise<FileNode[]> => {
-  console.log(`[API] listPublicFiles for path: ${path}`);
-  // The path here should be relative to the public root if that's how backend handles it
-  // e.g. if public root is /public, path "/" here means "/public" to listFiles
   let effectivePath = path;
   if (path === "/") {
-    // Root of public files
-    effectivePath = "/public"; // Assuming "/public" is the designated root public folder name
+    effectivePath = "/public";
   } else if (!path.startsWith("/public")) {
     effectivePath = `/public${path.startsWith("/") ? "" : "/"}${path}`;
   }
   return listFiles(effectivePath, true);
 };
 
-// --- SIMULATED FUNCTIONS for other operations ---
-const MOCK_DELAY = 300;
-
+/**
+ * Creates a new folder on the backend.
+ * @param folderName - The name for the new folder.
+ * @param parentNodeId - The UUID of the parent folder, or null if creating in root.
+ * @returns A Promise resolving with the created FileNode or rejecting with an ApiError.
+ */
 export const createFolder = async (
-  parentPath: string,
-  name: string
+  folderName: string,
+  parentNodeId: string | null // Changed from parentLogicalPath
 ): Promise<FileNode> => {
-  const fullPath = `${parentPath === "/" ? "" : parentPath}/${name}`;
-  console.log(`[SIMULATION] createFolder: ${fullPath}`);
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const mockFS = mockFileSystem_for_simulations;
-      if (!mockFS[parentPath]) {
-        reject({
-          message: `Parent path not found: ${parentPath}`,
-          statusCode: 404,
-        });
-        return;
-      }
-      if (
-        mockFS[parentPath]?.some(
-          (node) => node.name === name && node.is_directory
-        )
-      ) {
-        reject({ message: `Folder already exists: ${name}`, statusCode: 409 });
-        return;
-      }
-      const newFolder: FileNode = {
-        id: `sim-folder-${Date.now()}`,
-        name,
-        is_directory: true,
-        path: fullPath,
-        logical_path: fullPath,
-        owner_username: "testuser",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_public: parentPath.startsWith("/public"),
-      };
-      mockFS[parentPath] = [...(mockFS[parentPath] || []), newFolder];
-      mockFS[fullPath] = [];
-      resolve(newFolder);
-    }, MOCK_DELAY);
-  });
+  console.log(
+    `[API] createFolder: creating "${folderName}" under parent ID: ${parentNodeId}`
+  );
+
+  const requestBody = {
+    name: folderName,
+    is_directory: true,
+    parent: parentNodeId, // Send 'parent' with ID or null, as expected by backend
+  };
+
+  try {
+    // Backend POST /api/files/ endpoint expects 'parent' (ID or null)
+    const response = await apiClient.post<FileNode>("/files/", requestBody);
+
+    console.log("[API] createFolder successful:", response.data);
+    return {
+      ...response.data,
+      path: response.data.logical_path,
+    };
+  } catch (error: any) {
+    console.error("[API] createFolder failed:", error);
+    const apiError: ApiError = {
+      // Try to get a more specific error message from Django REST Framework validation errors
+      message:
+        error.response?.data?.parent?.[0] || // Check for parent field error
+        error.response?.data?.name?.[0] ||
+        error.response?.data?.detail ||
+        error.response?.data?.non_field_errors?.[0] ||
+        error.message ||
+        "Failed to create folder.",
+      statusCode: error.response?.status,
+      detail: error.response?.data,
+    };
+    throw apiError;
+  }
 };
+
+// --- Remaining SIMULATED FUNCTIONS ---
+const MOCK_DELAY = 300;
 
 export const renameNode = async (
   oldPath: string,
@@ -347,7 +169,7 @@ export const renameNode = async (
       const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "/";
       const nodeIndex = mockFS[parentPath]?.findIndex(
         (node) => node.logical_path === oldPath
-      ); // Use logical_path
+      );
       if (nodeIndex === undefined || nodeIndex === -1 || !mockFS[parentPath]) {
         reject({ message: `Node not found: ${oldPath}`, statusCode: 404 });
         return;
