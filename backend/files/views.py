@@ -109,7 +109,7 @@ class FileSystemNodeViewSet(viewsets.ModelViewSet):
                 {"detail": "Missing file in request."}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not _FILENAME_RE.fullmatch(file.name):
+        if not _NAME_RE.fullmatch(file.name):
             return Response({"detail": "Invalid filename."}, status=status.HTTP_400_BAD_REQUEST)
 
         if parent_id:
@@ -186,7 +186,7 @@ class FileSystemNodeViewSet(viewsets.ModelViewSet):
         if not new_name:
             return Response({"detail": "'name' is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not _FILENAME_RE.fullmatch(new_name):
+        if not _NAME_RE.fullmatch(new_name):
             return Response({"detail": "Invalid name format."}, status=status.HTTP_400_BAD_REQUEST)
 
         # 3) check unique_together: owner + parent + name + deleted_at
