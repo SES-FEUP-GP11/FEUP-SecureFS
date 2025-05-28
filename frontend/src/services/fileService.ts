@@ -55,29 +55,7 @@ const mockFileSystem_for_simulations: Record<string, FileNode[]> = {
     },
   ],
 };
-const recursivelyUpdatePathsAndMoveChildren_sim = (
-  oldDirKey: string,
-  newDirKey: string
-) => {
-  if (!mockFileSystem_for_simulations.hasOwnProperty(oldDirKey)) return;
-  const childrenToMove = mockFileSystem_for_simulations[oldDirKey]!;
-  delete mockFileSystem_for_simulations[oldDirKey];
-  mockFileSystem_for_simulations[newDirKey] = [];
-  for (const child of childrenToMove) {
-    const oldChildPath = child.logical_path;
-    const newChildPath = oldChildPath.startsWith(oldDirKey + "/")
-      ? newDirKey + oldChildPath.substring(oldDirKey.length)
-      : newDirKey + "/" + child.name;
-    const updatedChild = {
-      ...child,
-      path: newChildPath,
-      logical_path: newChildPath,
-    };
-    mockFileSystem_for_simulations[newDirKey].push(updatedChild);
-    if (updatedChild.is_directory)
-      recursivelyUpdatePathsAndMoveChildren_sim(oldChildPath, newChildPath);
-  }
-};
+// const recursivelyUpdatePathsAndMoveChildren_sim = (oldDirKey: string, newDirKey: string) => { /* ... simulation helper ... */ };
 
 export const listFiles = async (
   path: string,
@@ -197,16 +175,9 @@ export const deleteNode = async (nodeId: string): Promise<void> => {
   }
 };
 
-/**
- * Fetches details for a specific FileSystemNode by its logical path.
- * SIMULATED for now. Backend will need a GET /api/files/details/?path=<logical_path> endpoint.
- * @param logicalPath - The logical path of the node to fetch.
- * @returns A Promise resolving with the FileNode or rejecting with an ApiError.
- */
 export const fetchNodeDetailsByPath = async (
   logicalPath: string
 ): Promise<FileNode> => {
-  // Added export
   console.log(`[SIMULATION] fetchNodeDetailsByPath for: ${logicalPath}`);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -250,58 +221,57 @@ export const fetchNodeDetailsByPath = async (
         message: `Node details not found for path: ${logicalPath}`,
         statusCode: 404,
       });
-    }, MOCK_DELAY);
+    }, 300);
   });
+};
+
+/**
+ * Renames a file or folder on the backend.
+ * @param nodeId - The UUID of the FileSystemNode to rename.
+ * @param newName - The new name for the item.
+ * @returns A Promise resolving with the updated FileNode or rejecting with an ApiError.
+ */
+export const renameNode = async (
+  nodeId: string,
+  newName: string
+): Promise<FileNode> => {
+  console.log(
+    `[API] renameNode: Renaming node ID "${nodeId}" to new name "${newName}"`
+  );
+
+  const formData = new FormData();
+  formData.append("name", newName);
+
+  try {
+    // Backend endpoint is PATCH /api/files/{node_id}/rename/
+    // Axios automatically sets Content-Type to multipart/form-data for FormData.
+    const response = await apiClient.patch<FileNode>(
+      `/files/${nodeId}/rename/`,
+      formData
+    );
+
+    console.log("[API] renameNode successful:", response.data);
+    return {
+      ...response.data,
+      path: response.data.logical_path, // Ensure frontend 'path' consistency
+    };
+  } catch (error: any) {
+    console.error(`[API] renameNode failed for ID ${nodeId}:`, error);
+    const apiError: ApiError = {
+      message:
+        error.response?.data?.name?.[0] ||
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to rename item.",
+      statusCode: error.response?.status,
+      detail: error.response?.data,
+    };
+    throw apiError;
+  }
 };
 
 // --- Remaining SIMULATED FUNCTIONS ---
 const MOCK_DELAY = 300;
-
-export const renameNode = async (
-  oldPath: string,
-  newName: string
-): Promise<FileNode> => {
-  console.log(
-    `[SIMULATION] renameNode: from "${oldPath}" to new name "${newName}"`
-  );
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const mockFS = mockFileSystem_for_simulations;
-      const parentPath = oldPath.substring(0, oldPath.lastIndexOf("/")) || "/";
-      const nodeIndex = mockFS[parentPath]?.findIndex(
-        (node) => node.logical_path === oldPath
-      );
-      if (nodeIndex === undefined || nodeIndex === -1 || !mockFS[parentPath]) {
-        reject({ message: `Node not found: ${oldPath}`, statusCode: 404 });
-        return;
-      }
-      const itemToUpdate = mockFS[parentPath]![nodeIndex]!;
-      const newFullPath = `${parentPath === "/" ? "" : parentPath}/${newName}`;
-      if (
-        mockFS[parentPath]!.some(
-          (node) => node.name === newName && node.logical_path !== oldPath
-        )
-      ) {
-        reject({
-          message: `An item named "${newName}" already exists.`,
-          statusCode: 409,
-        });
-        return;
-      }
-      const updatedItemInParentList: FileNode = {
-        ...itemToUpdate,
-        name: newName,
-        path: newFullPath,
-        logical_path: newFullPath,
-        updated_at: new Date().toISOString(),
-      };
-      mockFS[parentPath]![nodeIndex] = updatedItemInParentList;
-      if (itemToUpdate.is_directory)
-        recursivelyUpdatePathsAndMoveChildren_sim(oldPath, newFullPath);
-      resolve(updatedItemInParentList);
-    }, MOCK_DELAY);
-  });
-};
 
 interface ShellCommandResult {
   output: string | null;
