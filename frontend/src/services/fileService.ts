@@ -59,7 +59,24 @@ const recursivelyUpdatePathsAndMoveChildren_sim = (
   oldDirKey: string,
   newDirKey: string
 ) => {
-  /* ... simulation helper ... */
+  if (!mockFileSystem_for_simulations.hasOwnProperty(oldDirKey)) return;
+  const childrenToMove = mockFileSystem_for_simulations[oldDirKey]!;
+  delete mockFileSystem_for_simulations[oldDirKey];
+  mockFileSystem_for_simulations[newDirKey] = [];
+  for (const child of childrenToMove) {
+    const oldChildPath = child.logical_path;
+    const newChildPath = oldChildPath.startsWith(oldDirKey + "/")
+      ? newDirKey + oldChildPath.substring(oldDirKey.length)
+      : newDirKey + "/" + child.name;
+    const updatedChild = {
+      ...child,
+      path: newChildPath,
+      logical_path: newChildPath,
+    };
+    mockFileSystem_for_simulations[newDirKey].push(updatedChild);
+    if (updatedChild.is_directory)
+      recursivelyUpdatePathsAndMoveChildren_sim(oldChildPath, newChildPath);
+  }
 };
 
 export const listFiles = async (
@@ -106,41 +123,22 @@ export const listPublicFiles = async (
   return listFiles(effectivePath, true);
 };
 
-/**
- * Creates a new folder on the backend.
- * @param folderName - The name for the new folder.
- * @param parentNodeId - The UUID of the parent folder, or null if creating in root.
- * @returns A Promise resolving with the created FileNode or rejecting with an ApiError.
- */
 export const createFolder = async (
   folderName: string,
-  parentNodeId: string | null // Changed from parentLogicalPath
+  parentNodeId: string | null
 ): Promise<FileNode> => {
-  console.log(
-    `[API] createFolder: creating "${folderName}" under parent ID: ${parentNodeId}`
-  );
-
   const requestBody = {
     name: folderName,
     is_directory: true,
-    parent: parentNodeId, // Send 'parent' with ID or null, as expected by backend
+    parent: parentNodeId,
   };
-
   try {
-    // Backend POST /api/files/ endpoint expects 'parent' (ID or null)
     const response = await apiClient.post<FileNode>("/files/", requestBody);
-
-    console.log("[API] createFolder successful:", response.data);
-    return {
-      ...response.data,
-      path: response.data.logical_path,
-    };
+    return { ...response.data, path: response.data.logical_path };
   } catch (error: any) {
-    console.error("[API] createFolder failed:", error);
     const apiError: ApiError = {
-      // Try to get a more specific error message from Django REST Framework validation errors
       message:
-        error.response?.data?.parent?.[0] || // Check for parent field error
+        error.response?.data?.parent?.[0] ||
         error.response?.data?.name?.[0] ||
         error.response?.data?.detail ||
         error.response?.data?.non_field_errors?.[0] ||
@@ -151,6 +149,109 @@ export const createFolder = async (
     };
     throw apiError;
   }
+};
+
+export const uploadFile = async (
+  file: File,
+  parentNodeId: string | null
+): Promise<FileNode> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (parentNodeId) {
+    formData.append("parent", parentNodeId);
+  }
+  try {
+    const response = await apiClient.post<FileNode>("/files/upload/", formData);
+    return { ...response.data, path: response.data.logical_path };
+  } catch (error: any) {
+    const apiError: ApiError = {
+      message:
+        error.response?.data?.file?.[0] ||
+        error.response?.data?.detail ||
+        error.response?.data?.non_field_errors?.[0] ||
+        error.message ||
+        "Failed to upload file.",
+      statusCode: error.response?.status,
+      detail: error.response?.data,
+    };
+    throw apiError;
+  }
+};
+
+export const deleteNode = async (nodeId: string): Promise<void> => {
+  console.log(`[API] deleteNode: Deleting node with ID: ${nodeId}`);
+  try {
+    await apiClient.delete(`/files/${nodeId}/`);
+    console.log(`[API] deleteNode successful for ID: ${nodeId}`);
+  } catch (error: any) {
+    console.error(`[API] deleteNode failed for ID ${nodeId}:`, error);
+    const apiError: ApiError = {
+      message:
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to delete item.",
+      statusCode: error.response?.status,
+      detail: error.response?.data,
+    };
+    throw apiError;
+  }
+};
+
+/**
+ * Fetches details for a specific FileSystemNode by its logical path.
+ * SIMULATED for now. Backend will need a GET /api/files/details/?path=<logical_path> endpoint.
+ * @param logicalPath - The logical path of the node to fetch.
+ * @returns A Promise resolving with the FileNode or rejecting with an ApiError.
+ */
+export const fetchNodeDetailsByPath = async (
+  logicalPath: string
+): Promise<FileNode> => {
+  // Added export
+  console.log(`[SIMULATION] fetchNodeDetailsByPath for: ${logicalPath}`);
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      for (const key in mockFileSystem_for_simulations) {
+        const foundNode = mockFileSystem_for_simulations[key]?.find(
+          (node) => node.logical_path === logicalPath
+        );
+        if (foundNode) {
+          resolve(foundNode);
+          return;
+        }
+      }
+      if (mockFileSystem_for_simulations.hasOwnProperty(logicalPath)) {
+        const segments = logicalPath.split("/").filter(Boolean);
+        const name =
+          segments.pop() || (logicalPath === "/" ? "Root" : "Unknown");
+        const parentPath =
+          segments.length > 0
+            ? `/${segments.join("/")}`
+            : logicalPath === "/"
+            ? null
+            : "/";
+        let actualNode: FileNode | undefined;
+        if (parentPath && mockFileSystem_for_simulations[parentPath]) {
+          actualNode = mockFileSystem_for_simulations[parentPath]?.find(
+            (n) => n.logical_path === logicalPath
+          );
+        } else if (logicalPath === "/") {
+          reject({
+            message: "Cannot fetch details for root path '/' as a node.",
+            statusCode: 400,
+          });
+          return;
+        }
+        if (actualNode) {
+          resolve(actualNode);
+          return;
+        }
+      }
+      reject({
+        message: `Node details not found for path: ${logicalPath}`,
+        statusCode: 404,
+      });
+    }, MOCK_DELAY);
+  });
 };
 
 // --- Remaining SIMULATED FUNCTIONS ---
@@ -199,75 +300,6 @@ export const renameNode = async (
         recursivelyUpdatePathsAndMoveChildren_sim(oldPath, newFullPath);
       resolve(updatedItemInParentList);
     }, MOCK_DELAY);
-  });
-};
-
-export const deleteNode = async (nodePath: string): Promise<void> => {
-  console.log(`[SIMULATION] deleteNode: ${nodePath}`);
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const mockFS = mockFileSystem_for_simulations;
-      const parentPath =
-        nodePath.substring(0, nodePath.lastIndexOf("/")) || "/";
-      const nodeExistsInParent = mockFS[parentPath]?.some(
-        (node) => node.logical_path === nodePath
-      );
-      if (!nodeExistsInParent && !mockFS.hasOwnProperty(nodePath)) {
-        reject({ message: `Node not found: ${nodePath}`, statusCode: 404 });
-        return;
-      }
-      if (mockFS[parentPath])
-        mockFS[parentPath] =
-          mockFS[parentPath]?.filter(
-            (node) => node.logical_path !== nodePath
-          ) ?? [];
-      if (mockFS.hasOwnProperty(nodePath)) delete mockFS[nodePath];
-      resolve();
-    }, MOCK_DELAY);
-  });
-};
-
-export const uploadFile = async (
-  file: File,
-  targetPath: string
-): Promise<FileNode> => {
-  const fullPath = `${targetPath === "/" ? "" : targetPath}/${file.name}`;
-  console.log(`[SIMULATION] uploadFile: "${file.name}" to "${targetPath}"`);
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const mockFS = mockFileSystem_for_simulations;
-      if (!mockFS.hasOwnProperty(targetPath)) {
-        reject({
-          message: `Target directory not found: ${targetPath}`,
-          statusCode: 404,
-        });
-        return;
-      }
-      if (
-        mockFS[targetPath]?.some(
-          (node) => node.name === file.name && !node.is_directory
-        )
-      ) {
-        mockFS[targetPath] = mockFS[targetPath]!.filter(
-          (node) => node.name !== file.name
-        );
-      }
-      const newFileNode: FileNode = {
-        id: `sim-file-${Date.now()}`,
-        name: file.name,
-        is_directory: false,
-        path: fullPath,
-        logical_path: fullPath,
-        size_bytes: file.size,
-        mime_type: file.type || "application/octet-stream",
-        owner_username: "testuser",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_public: targetPath.startsWith("/public"),
-      };
-      mockFS[targetPath]?.push(newFileNode);
-      resolve(newFileNode);
-    }, 1200);
   });
 };
 

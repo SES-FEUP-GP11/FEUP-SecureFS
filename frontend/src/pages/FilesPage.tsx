@@ -3,10 +3,11 @@ import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import type { ApiError, FileNode } from "../types";
 import {
   createFolder as createFolderService,
-  deleteNode as deleteNodeService,
+  deleteNode as deleteNodeService, // This will be the API-connected version
   listFiles,
   renameNode as renameNodeService,
   uploadFile as uploadFileService,
+  fetchNodeDetailsByPath,
 } from "../services/fileService";
 import {
   AlertCircle,
@@ -41,31 +42,25 @@ type AccessSettings = {
   }>;
 };
 
-// Define the expected structure for location state
 interface FilesPageLocationState {
-  currentFolderId?: string | null; // ID of the folder being navigated into
+  currentFolderId?: string | null;
 }
 
 const FilesPage: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams();
-  const location = useLocation(); // Get location object to access state
+  const location = useLocation();
 
   const splatPath = params["*"] || "";
-  const currentDirectoryPath = `/${splatPath}`; // Logical path for the current view
+  const currentDirectoryPath = `/${splatPath}`;
 
-  // Get currentFolderId from navigation state. This is the ID of the currentDirectoryPath.
-  // It's null if at the root or if state wasn't passed (e.g., direct URL, some breadcrumb clicks).
-  const locationState = location.state as FilesPageLocationState | null;
-  const currentDirectoryNodeId = locationState?.currentFolderId || null;
-
-  console.log(
-    `[FilesPage] Rendering. currentDirectoryPath: "${currentDirectoryPath}", currentDirectoryNodeId (from location.state):`,
-    currentDirectoryNodeId
-  );
+  const [currentFolderObject, setCurrentFolderObject] =
+    useState<FileNode | null>(null);
 
   const [files, setFiles] = useState<FileNode[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoadingFolderInfo, setIsLoadingFolderInfo] =
+    useState<boolean>(false);
   const [error, setError] = useState<ApiError | null>(null);
 
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
@@ -80,11 +75,34 @@ const FilesPage: React.FC = () => {
     null
   );
 
+  useEffect(() => {
+    const locationState = location.state as FilesPageLocationState | null;
+    const idFromState = locationState?.currentFolderId;
+    if (currentDirectoryPath === "/") {
+      setCurrentFolderObject(null);
+      setIsLoadingFolderInfo(false);
+    } else if (idFromState) {
+      setCurrentFolderObject({
+        id: idFromState,
+        logical_path: currentDirectoryPath,
+      } as FileNode);
+      setIsLoadingFolderInfo(false);
+    } else {
+      setIsLoadingFolderInfo(true);
+      fetchNodeDetailsByPath(currentDirectoryPath)
+        .then((nodeDetails) => setCurrentFolderObject(nodeDetails))
+        .catch((err) => {
+          setError(err as ApiError);
+          setCurrentFolderObject(null);
+        })
+        .finally(() => setIsLoadingFolderInfo(false));
+    }
+  }, [currentDirectoryPath, location.state]);
+
   const fetchFiles = useCallback(async () => {
     let servicePath = currentDirectoryPath;
-    if (servicePath !== "/" && servicePath.endsWith("/")) {
+    if (servicePath !== "/" && servicePath.endsWith("/"))
       servicePath = servicePath.slice(0, -1);
-    }
     setIsLoading(true);
     setError(null);
     try {
@@ -99,8 +117,8 @@ const FilesPage: React.FC = () => {
   }, [currentDirectoryPath]);
 
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    if (!isLoadingFolderInfo) fetchFiles();
+  }, [fetchFiles, isLoadingFolderInfo]);
 
   const handleItemClick = (item: FileNode, event?: React.MouseEvent) => {
     if (event && (event.target as HTMLElement).closest(".context-menu-button"))
@@ -110,8 +128,6 @@ const FilesPage: React.FC = () => {
         ? "/public"
         : "/files";
       const navigateTo = `${baseNavPath}${item.logical_path}`;
-      // Pass the ID of the folder being navigated into as state
-      // This ID will be used as the parentId if creating a new folder inside it.
       navigate(navigateTo.replace(/\/\//g, "/"), {
         state: { currentFolderId: item.id },
       });
@@ -121,15 +137,12 @@ const FilesPage: React.FC = () => {
   };
 
   const handleCreateFolder = async (folderName: string) => {
-    // Use currentDirectoryNodeId (which is parent's ID, or null for root)
-    console.log(
-      `FilesPage: Attempting to create folder "${folderName}" under parent ID: ${currentDirectoryNodeId}`
-    );
+    const parentIdToUse = currentFolderObject?.id || null;
     try {
-      await createFolderService(folderName, currentDirectoryNodeId);
+      await createFolderService(folderName, parentIdToUse);
       await fetchFiles();
     } catch (err) {
-      console.error(`FilesPage: Failed to create folder "${folderName}"`, err);
+      console.error(`FilesPage: Failed to create folder`, err);
       throw err;
     }
   };
@@ -146,9 +159,17 @@ const FilesPage: React.FC = () => {
     }
   };
 
+  /**
+   * Handles the deletion of a file or folder.
+   * Calls the deleteNodeService with the item's ID.
+   */
   const handleDeleteItem = async (item: FileNode) => {
+    console.log(
+      `FilesPage: Attempting to delete item ID: "${item.id}", Name: "${item.name}"`
+    );
     try {
-      await deleteNodeService(item.logical_path);
+      await deleteNodeService(item.id); // Pass the item's ID
+      console.log(`FilesPage: Item deleted successfully. Refreshing list.`);
       setItemToDelete(null);
       setIsDeleteModalOpen(false);
       await fetchFiles();
@@ -158,13 +179,10 @@ const FilesPage: React.FC = () => {
     }
   };
 
-  const handleUploadFile = async (file: File, targetPath: string) => {
-    // targetPath for uploadFileService is the logical path of the parent directory
-    let serviceTargetPath = targetPath;
-    if (serviceTargetPath !== "/" && serviceTargetPath.endsWith("/"))
-      serviceTargetPath = serviceTargetPath.slice(0, -1);
+  const handleUploadFile = async (file: File, _targetPathDisplay: string) => {
+    const parentIdToUse = currentFolderObject?.id || null;
     try {
-      await uploadFileService(file, serviceTargetPath);
+      await uploadFileService(file, parentIdToUse);
       await fetchFiles();
     } catch (err) {
       console.error(`FilesPage: Failed to upload file`, err);
@@ -179,10 +197,10 @@ const FilesPage: React.FC = () => {
     console.log(`FilesPage: Saving access for "${itemPath}":`, settings);
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setFiles((prevFiles) =>
-      prevFiles.map((file) =>
-        file.logical_path === itemPath
-          ? { ...file, is_public: settings.isPublic }
-          : file
+      prevFiles.map((fileNode) =>
+        fileNode.logical_path === itemPath
+          ? { ...fileNode, is_public: settings.is_public }
+          : fileNode
       )
     );
   };
@@ -223,7 +241,7 @@ const FilesPage: React.FC = () => {
 
   const isInPublicFolder = currentDirectoryPath.startsWith("/public");
 
-  if (isLoading && files.length === 0) {
+  if ((isLoading || isLoadingFolderInfo) && files.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
@@ -231,7 +249,7 @@ const FilesPage: React.FC = () => {
       </div>
     );
   }
-  if (error && files.length === 0) {
+  if (error && files.length === 0 && !isLoading) {
     return (
       <div
         className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative flex items-center"
@@ -247,7 +265,10 @@ const FilesPage: React.FC = () => {
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <div className="mb-4 pb-4 border-b border-gray-200">
-        <Breadcrumbs currentPath={currentDirectoryPath} />
+        <Breadcrumbs
+          currentPath={currentDirectoryPath}
+          currentFolderId={currentFolderObject?.id}
+        />
         <div className="flex justify-between items-center mt-2 flex-wrap gap-2">
           <div>
             <div className="flex items-center">
@@ -268,6 +289,7 @@ const FilesPage: React.FC = () => {
             {isInPublicFolder ? (
               <Link
                 to="/files"
+                state={{ currentFolderId: null }}
                 className="flex items-center px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <Lock size={18} className="mr-2" />
@@ -276,6 +298,7 @@ const FilesPage: React.FC = () => {
             ) : (
               <Link
                 to="/public"
+                state={{ currentFolderId: null }}
                 className="flex items-center px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 <Globe size={18} className="mr-2" />
@@ -300,7 +323,7 @@ const FilesPage: React.FC = () => {
         </div>
       </div>
 
-      {isLoading && files.length > 0 && (
+      {(isLoading || isLoadingFolderInfo) && files.length > 0 && (
         <div className="text-center py-4 text-gray-500">
           <Loader2 className="h-6 w-6 animate-spin inline mr-2" /> Loading
           more...
@@ -311,7 +334,7 @@ const FilesPage: React.FC = () => {
           Error refreshing content: {error.message}
         </div>
       )}
-      {!isLoading && files.length === 0 && !error && (
+      {!isLoading && !isLoadingFolderInfo && files.length === 0 && !error && (
         <div className="text-center py-10">
           <Folder className="mx-auto h-12 w-12 text-gray-400" />
           <p className="mt-2 text-sm font-medium text-gray-500">
