@@ -1,11 +1,11 @@
 import React, { useEffect, useState, FormEvent } from "react";
-import Modal from "../Common/Modal"; // Assuming Modal.tsx is in ../Common/
+import Modal from "../Common/Modal";
 import type {
   FileNode,
   ApiError,
   SharePermission,
   User as AppUser,
-} from "../../types"; // User type from your app
+} from "../../types";
 import {
   AlertCircle,
   Check,
@@ -16,33 +16,24 @@ import {
   Users,
   X,
   Eye,
+  Loader2,
 } from "lucide-react";
-import { createShare } from "../../services/fileService"; // Import createShare
+import { createShare } from "../../services/fileService";
+import { listUsers } from "../../services/authService"; // Import listUsers
 
-// This type might be extended with more details if backend provides them
 type ExistingPermissionUser = {
-  id: string; // Permission ID
-  userId: number; // User ID
-  email: string; // User email for display
-  name: string; // User name for display
+  id: string;
+  userId: number;
+  email: string;
+  name: string;
   role: "viewer" | "editor" | "owner";
-};
-
-type AccessSettings = {
-  isPublic: boolean; // This might be handled by a separate mechanism now
-  publicRole: "viewer" | "editor" | "none";
-  shareLink: string; // Still useful to display
-  // This will be populated by fetching existing shares for the item
-  permissions: ExistingPermissionUser[];
 };
 
 type AccessControlModalProps = {
   isOpen: boolean;
   onClose: () => void;
   item: FileNode | null;
-  // onSaveAccess might be replaced by more specific handlers or a general refresh
-  onShareCreated: () => void; // Callback after a share is successfully created
-  // TODO: Add props for fetching existing shares, removing shares, updating roles
+  onShareCreated: () => void;
 };
 
 const AccessControlModal: React.FC<AccessControlModalProps> = ({
@@ -51,21 +42,21 @@ const AccessControlModal: React.FC<AccessControlModalProps> = ({
   item,
   onShareCreated,
 }) => {
-  // State for managing who the item is shared with
-  // This would ideally be fetched from backend: GET /api/sharing/?node_id={item.id}
   const [sharedUsers, setSharedUsers] = useState<ExistingPermissionUser[]>([]);
 
-  // State for adding a new user
-  const [newShareUserId, setNewShareUserId] = useState(""); // Expecting user ID (number)
+  // State for adding a new user via select dropdown
+  const [availableUsers, setAvailableUsers] = useState<AppUser[]>([]);
+  const [selectedUserIdToShare, setSelectedUserIdToShare] =
+    useState<string>(""); // Store ID as string from select
   const [newUserPermission, setNewUserPermission] = useState<"view" | "edit">(
     "view"
   );
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingShare, setIsSubmittingShare] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // For public link and general access (simplified for now)
   const [isPublic, setIsPublic] = useState(false);
   const [publicRole, setPublicRole] = useState<"viewer" | "editor" | "none">(
     "none"
@@ -75,77 +66,82 @@ const AccessControlModal: React.FC<AccessControlModalProps> = ({
 
   useEffect(() => {
     if (isOpen && item) {
-      // Reset form state
-      setNewShareUserId("");
+      setSelectedUserIdToShare("");
       setNewUserPermission("view");
       setError(null);
       setSuccessMessage(null);
-      setIsSubmitting(false);
+      setIsSubmittingShare(false);
       setLinkCopied(false);
-
-      // Populate initial state based on item (mocked/simplified for now)
       setIsPublic(item.is_public || false);
-      setPublicRole(item.is_public ? "viewer" : "none"); // Default public role if item is public
+      setPublicRole(item.is_public ? "viewer" : "none");
       setShareLink(
         item.is_public ? `https://securefs.example.com/shared/${item.id}` : ""
       );
 
-      // TODO: Fetch existing shares for this item when modal opens
-      // Example: getSharePermissionsForItem(item.id).then(setSharedUsers);
-      // For now, using a placeholder for the owner:
       setSharedUsers([
         {
           id: "owner-perm",
-          userId: 0, // Placeholder for current user/owner ID
+          userId: 0,
           name: item.owner_username || "Owner",
           email: "(You)",
           role: "owner",
         },
       ]);
+
+      // Fetch available users for the dropdown
+      setIsLoadingUsers(true);
+      listUsers()
+        .then((users) => {
+          setAvailableUsers(users);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch users for sharing:", err);
+          setError("Could not load users to share with.");
+        })
+        .finally(() => setIsLoadingUsers(false));
     }
   }, [isOpen, item]);
 
   const handleAddShareSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!item || !newShareUserId.trim()) {
-      setError("User ID and item are required.");
+    if (!item || !selectedUserIdToShare) {
+      setError("Please select a user and ensure an item is selected.");
       return;
     }
-    const userIdNum = parseInt(newShareUserId.trim(), 10);
+    const userIdNum = parseInt(selectedUserIdToShare, 10);
     if (isNaN(userIdNum)) {
-      setError("User ID must be a number.");
+      setError("Invalid user selected."); // Should not happen with select
       return;
     }
 
-    // Prevent sharing with self or if already shared (basic client check)
-    // A more robust check would involve fetching current user ID from AuthContext
     if (sharedUsers.some((su) => su.userId === userIdNum)) {
-      setError("This item is already shared with this user ID.");
+      setError("This item is already shared with this user.");
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSubmittingShare(true);
     setError(null);
     setSuccessMessage(null);
-
     try {
       const newShare = await createShare(item.id, userIdNum, newUserPermission);
       setSuccessMessage(
         `Successfully shared with user ID ${newShare.shared_with_user} as ${newShare.permission_level}.`
       );
-      // TODO: Refresh sharedUsers list by fetching from backend or adding locally
-      // For now, just clearing input and calling the callback
-      setNewShareUserId("");
+      setSelectedUserIdToShare("");
       if (onShareCreated) onShareCreated();
-      // Ideally, fetch and update sharedUsers list here
-      // For simulation, add to local state:
       setSharedUsers((prev) => [
         ...prev,
         {
-          id: newShare.id, // ID of the SharePermission record
+          id: newShare.id,
           userId: newShare.shared_with_user,
-          name: `User ${newShare.shared_with_user}`, // Placeholder name
-          email: `user${newShare.shared_with_user}@example.com`, // Placeholder email
+          name:
+            availableUsers.find(
+              (u) => u.id.toString() === selectedUserIdToShare
+            )?.email || `User ${newShare.shared_with_user}`, // Display email or placeholder
+          email:
+            availableUsers.find(
+              (u) => u.id.toString() === selectedUserIdToShare
+            )?.email || `user${newShare.shared_with_user}@example.com`,
           role: newShare.permission_level,
         },
       ]);
@@ -153,38 +149,25 @@ const AccessControlModal: React.FC<AccessControlModalProps> = ({
       const apiError = err as ApiError;
       setError(apiError.message || "Failed to share item.");
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingShare(false);
     }
   };
 
   const handleCopyLink = async () => {
-    if (!shareLink) return;
-    try {
-      await navigator.clipboard.writeText(shareLink);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy link:", err);
-    }
+    /* ... */
   };
-
-  // Placeholder functions for managing existing shares (remove, change role)
-  // These would call respective service functions and update `sharedUsers` state
   const handleRemoveUserAccess = (userId: number) => {
-    console.log("TODO: Remove access for user ID:", userId);
     setError("Remove user not implemented yet.");
   };
   const handleChangeUserRole = (
     userId: number,
     newRole: "viewer" | "editor"
   ) => {
-    console.log("TODO: Change role for user ID:", userId, "to", newRole);
     setError("Change role not implemented yet.");
   };
   const handlePublicAccessChange = (makePublic: boolean) => {
     setIsPublic(makePublic);
     setPublicRole(makePublic ? "viewer" : "none");
-    console.log("TODO: API call to set public access", makePublic);
     setError("Set public access not fully implemented yet.");
   };
 
@@ -193,7 +176,6 @@ const AccessControlModal: React.FC<AccessControlModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Share "${item.name}"`}>
       <div className="space-y-6">
-        {/* Section to add new people */}
         <form onSubmit={handleAddShareSubmit} className="space-y-3">
           <h3 className="text-md font-medium text-gray-800">
             Share with people
@@ -201,36 +183,52 @@ const AccessControlModal: React.FC<AccessControlModalProps> = ({
           <div className="flex items-end space-x-2">
             <div className="flex-grow">
               <label
-                htmlFor="userIdToShare"
+                htmlFor="userToShareSelect"
                 className="block text-sm font-medium text-gray-700"
               >
-                User ID
+                User
               </label>
-              <input
-                id="userIdToShare"
-                type="number" // Expecting user ID as per API
-                value={newShareUserId}
-                onChange={(e) => setNewShareUserId(e.target.value)}
-                placeholder="Enter User ID to share with"
-                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm sm:text-sm"
-                disabled={isSubmitting}
-              />
+              {isLoadingUsers ? (
+                <div className="mt-1 flex items-center text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading
+                  users...
+                </div>
+              ) : (
+                <select
+                  id="userToShareSelect"
+                  value={selectedUserIdToShare}
+                  onChange={(e) => setSelectedUserIdToShare(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  disabled={isSubmittingShare || availableUsers.length === 0}
+                >
+                  <option value="" disabled>
+                    Select a user
+                  </option>
+                  {availableUsers.map((u) => (
+                    <option key={u.id} value={u.id.toString()}>
+                      {u.first_name && u.last_name
+                        ? `${u.first_name} ${u.last_name} (${u.email})`
+                        : u.email}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <label
-                htmlFor="permissionLevel"
+                htmlFor="permissionLevelShare"
                 className="block text-sm font-medium text-gray-700"
               >
                 Permission
               </label>
               <select
-                id="permissionLevel"
+                id="permissionLevelShare"
                 value={newUserPermission}
                 onChange={(e) =>
                   setNewUserPermission(e.target.value as "view" | "edit")
                 }
                 className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm sm:text-sm"
-                disabled={isSubmitting}
+                disabled={isSubmittingShare}
               >
                 <option value="view">Can view</option>
                 <option value="edit">Can edit</option>
@@ -238,15 +236,16 @@ const AccessControlModal: React.FC<AccessControlModalProps> = ({
             </div>
             <button
               type="submit"
-              disabled={isSubmitting || !newShareUserId.trim()}
+              disabled={
+                isSubmittingShare || !selectedUserIdToShare || isLoadingUsers
+              }
               className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 h-[38px] mt-auto"
             >
-              {isSubmitting ? "Sharing..." : "Share"}
+              {isSubmittingShare ? "Sharing..." : "Share"}
             </button>
           </div>
         </form>
 
-        {/* Display messages */}
         {error && (
           <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-md text-sm">
             {error}
@@ -258,7 +257,6 @@ const AccessControlModal: React.FC<AccessControlModalProps> = ({
           </div>
         )}
 
-        {/* Section to manage existing shares */}
         {sharedUsers.length > 0 && (
           <div>
             <h3 className="text-md font-medium text-gray-800 mt-4 mb-2">
@@ -308,8 +306,6 @@ const AccessControlModal: React.FC<AccessControlModalProps> = ({
             </ul>
           </div>
         )}
-
-        {/* Public Access Section (Simplified) */}
         <div className="mt-6 pt-4 border-t">
           <h3 className="text-md font-medium text-gray-800 mb-2">
             General access
@@ -378,5 +374,4 @@ const AccessControlModal: React.FC<AccessControlModalProps> = ({
     </Modal>
   );
 };
-
 export default AccessControlModal;
