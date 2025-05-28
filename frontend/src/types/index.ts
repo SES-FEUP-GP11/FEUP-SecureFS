@@ -1,6 +1,3 @@
-/**
- * Represents a user account in the system.
- */
 export interface User {
   id: number | string;
   email: string;
@@ -10,36 +7,37 @@ export interface User {
 
 /**
  * Represents a node in the file system (can be a file or a directory).
- * Aligned with the backend response structure for /api/files/ endpoint.
  */
 export interface FileNode {
-  id: string;                 // UUID from backend
-  name: string;               // Filename or folder name
+  id: string;
+  name: string;
   is_directory: boolean;
-  logical_path: string;       // Full logical path from user's root, e.g., "/Documents/report.txt"
-  size_bytes?: number | null;  // Size in bytes, null for directories
-  mime_type?: string | null;   // MIME type for files, null for directories
-  is_public_root?: boolean;    // True if this folder is the root of the user's public page
-  created_at: string;         // ISO 8601 datetime string
-  updated_at: string;         // ISO 8601 datetime string
+  logical_path: string; // Canonical logical path from backend
+  path: string; // Kept for frontend consistency, should mirror logical_path
+  size_bytes?: number | null;
+  mime_type?: string | null;
+  is_public_root?: boolean;
+  created_at: string;
+  updated_at: string;
   
-  // Optional fields that your frontend simulation used,
-  // include them if your backend serializer for listFiles will provide them.
   owner_username?: string; 
-  is_public?: boolean;      // This can be derived client-side based on logical_path,
-                            // is_public_root, or explicitly provided by backend.
+  is_public?: boolean; // Derived or set based on sharing settings
 }
 
 /**
- * Represents sharing permission granted on a FileNode.
+ * Represents sharing permission granted on a FileSystemNode.
+ * Aligned with the backend response for POST /api/sharing/
  */
 export interface SharePermission {
-  id: string;
-  node_id: string;
-  shared_with_username: string;
+  id: string;                 // UUID of the permission record itself
+  node: string;               // UUID of the FileNode being shared
+  shared_with_user: number;   // Integer ID of the user it's shared with
+  // shared_with_username?: string; // Optional: if backend provides for display
+  // shared_with_email?: string; // Optional: if backend provides for display
   permission_level: "view" | "edit";
-  granted_by_username: string;
   created_at: string;
+  updated_at?: string; // Backend response includes this
+  // granted_by_user_id might also be useful if backend sends it
 }
 
 /**

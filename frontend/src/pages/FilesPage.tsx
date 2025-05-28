@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
-import type { ApiError, FileNode } from "../types";
+import type { ApiError, FileNode, SharePermission } from "../types"; // Added SharePermission
 import {
   createFolder as createFolderService,
   deleteNode as deleteNodeService,
   listFiles,
-  renameNode as renameNodeService, // This will be the API-connected version
+  renameNode as renameNodeService,
   uploadFile as uploadFileService,
   fetchNodeDetailsByPath,
+  createShare as createShareService, // Import createShare
+  // listSharedWithMe, // Will be used for SharedWithMePage
 } from "../services/fileService";
 import {
   AlertCircle,
@@ -20,8 +22,9 @@ import {
   Lock,
   MoreVertical,
   PlusCircle,
+  Share2 as ShareIcon,
   Trash2,
-  UploadCloud as UploadIcon,
+  UploadCloud as UploadIcon, // Added ShareIcon
 } from "lucide-react";
 import Breadcrumbs from "../components/files/Breadcrumbs";
 import CreateFolderModal from "../components/files/CreateFolderModal";
@@ -31,6 +34,7 @@ import UploadFileModal from "../components/files/UploadFileModal";
 import AccessControlModal from "../components/files/AccessControlModal";
 
 type AccessSettings = {
+  // This is used by AccessControlModal's internal simulation
   isPublic: boolean;
   publicRole: "viewer" | "editor" | "none";
   shareLink: string;
@@ -69,8 +73,11 @@ const FilesPage: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<FileNode | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  // Using itemForAccess for the AccessControlModal/ShareModal
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [itemForAccess, setItemForAccess] = useState<FileNode | null>(null);
+
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(
     null
   );
@@ -106,8 +113,8 @@ const FilesPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const isBrowsingPublic = window.location.pathname.startsWith("/public");
-      const fetchedFiles = await listFiles(servicePath, isBrowsingPublic);
+      const isBrowsePublic = window.location.pathname.startsWith("/public");
+      const fetchedFiles = await listFiles(servicePath, isBrowsePublic);
       setFiles(fetchedFiles);
     } catch (err) {
       setError(err as ApiError);
@@ -147,17 +154,9 @@ const FilesPage: React.FC = () => {
     }
   };
 
-  /**
-   * Handles renaming an item.
-   * Calls the renameNodeService with the item's ID and the new name.
-   */
   const handleRenameItem = async (item: FileNode, newName: string) => {
-    console.log(
-      `FilesPage: Attempting to rename item ID "${item.id}" (Name: "${item.name}") to "${newName}"`
-    );
     try {
-      await renameNodeService(item.id, newName); // Pass item.id instead of item.logical_path
-      console.log(`FilesPage: Item renamed successfully. Refreshing list.`);
+      await renameNodeService(item.id, newName);
       setItemToRename(null);
       setIsRenameModalOpen(false);
       await fetchFiles();
@@ -168,12 +167,8 @@ const FilesPage: React.FC = () => {
   };
 
   const handleDeleteItem = async (item: FileNode) => {
-    console.log(
-      `FilesPage: Attempting to delete item ID: "${item.id}", Name: "${item.name}"`
-    );
     try {
       await deleteNodeService(item.id);
-      console.log(`FilesPage: Item deleted successfully. Refreshing list.`);
       setItemToDelete(null);
       setIsDeleteModalOpen(false);
       await fetchFiles();
@@ -194,19 +189,36 @@ const FilesPage: React.FC = () => {
     }
   };
 
-  const handleSaveAccess = async (
-    itemPath: string,
+  // This function is called by AccessControlModal's "Save Changes"
+  // It will now primarily handle making an item public or private via an API call.
+  // User-specific sharing is handled by adding/removing users within the modal, making direct API calls.
+  const handleSaveAccessSettings = async (
+    itemId: string,
     settings: AccessSettings
   ) => {
-    console.log(`FilesPage: Saving access for "${itemPath}":`, settings);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    console.log(
+      `FilesPage: Saving GENERAL access settings for item ID "${itemId}":`,
+      settings
+    );
+    // TODO: Implement API call to set item public status and public role
+    // Example: await setPublicAccessService(itemId, settings.isPublic, settings.publicRole);
+    // For now, simulate success and update local state for visual feedback
+    await new Promise((resolve) => setTimeout(resolve, 500));
     setFiles((prevFiles) =>
       prevFiles.map((fileNode) =>
-        fileNode.logical_path === itemPath
-          ? { ...fileNode, is_public: settings.is_public }
+        fileNode.id === itemId
+          ? {
+              ...fileNode,
+              is_public: settings.isPublic,
+              is_public_root: settings.isPublic && fileNode.is_directory,
+            }
           : fileNode
       )
     );
+    console.log(
+      `FilesPage: General access settings (public status) saved for "${itemId}"`
+    );
+    fetchFiles(); // Refresh list to get latest state from (simulated or real) backend
   };
 
   const openRenameModal = (item: FileNode) => {
@@ -422,11 +434,12 @@ const FilesPage: React.FC = () => {
                     >
                       <Edit3 size={16} className="mr-2" /> Rename
                     </button>
+                    {/* MODIFIED: Context menu uses ShareIcon and calls openAccessModal */}
                     <button
                       onClick={() => openAccessModal(file)}
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
                     >
-                      <Eye size={16} className="mr-2" /> Share & Access
+                      <ShareIcon size={16} className="mr-2" /> Share / Access
                     </button>
                     <button
                       onClick={() => openDeleteModal(file)}
@@ -472,6 +485,7 @@ const FilesPage: React.FC = () => {
         onUpload={handleUploadFile}
         targetPath={currentDirectoryPath}
       />
+      {/* AccessControlModal is used for Sharing */}
       <AccessControlModal
         isOpen={isAccessModalOpen}
         onClose={() => {
@@ -479,7 +493,8 @@ const FilesPage: React.FC = () => {
           setItemForAccess(null);
         }}
         item={itemForAccess}
-        onSaveAccess={handleSaveAccess}
+        onShareCreated={fetchFiles} // Refresh list after a new share is created
+        // onSaveAccess={handleSaveAccessSettings} // Keep this if AccessControlModal also handles general public access settings
       />
     </div>
   );

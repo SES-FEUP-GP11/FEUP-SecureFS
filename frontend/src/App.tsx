@@ -5,7 +5,8 @@ import MainLayout from "./layouts/MainLayout";
 import PrivateRoute from "./components/Common/PrivateRoute";
 import FilesPage from "./pages/FilesPage";
 import PublicFilesPage from "./pages/PublicFilesPage";
-import ShellPage from "./pages/ShellPage"; // Import the new ShellPage
+import ShellPage from "./pages/ShellPage";
+import SharedWithMePage from "./pages/SharedWithMePage"; // Import the new page
 
 export default function App() {
   console.log("[App.tsx] Rendering App component");
@@ -21,8 +22,10 @@ export default function App() {
         <Route element={<PrivateRoute />}>
           <Route element={<MainLayout />}>
             <Route path="files/*" element={<FilesPage />} />
-            <Route path="shell" element={<ShellPage />} />{" "}
-            {/* ADDED ShellPage Route */}
+            <Route path="shell" element={<ShellPage />} />
+            <Route path="shared" element={<SharedWithMePage />} />{" "}
+            {/* ADDED SharedWithMePage Route */}
+            {/* Default route after login redirects to the base files path */}
             <Route index element={<Navigate to="/files" replace />} />
           </Route>
         </Route>
