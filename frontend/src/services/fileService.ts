@@ -1,62 +1,7 @@
-import type { FileNode, ApiError } from "../types";
+import type { FileNode, ApiError, SharePermission } from "../types";
 import apiClient from "./apiClient";
 
-// Mock data only for functions NOT YET connected to backend
-const mockFileSystem_for_simulations: Record<string, FileNode[]> = {
-  "/": [
-    {
-      id: "sim-folder-public",
-      name: "public",
-      is_directory: true,
-      path: "/public",
-      logical_path: "/public",
-      owner_username: "testuser",
-      is_public: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      is_public_root: true,
-    },
-    {
-      id: "sim-folder-docs",
-      name: "Docs",
-      is_directory: true,
-      path: "/Docs",
-      logical_path: "/Docs",
-      owner_username: "testuser",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ],
-  "/public": [
-    {
-      id: "sim-file-readme",
-      name: "README.md",
-      is_directory: false,
-      path: "/public/README.md",
-      logical_path: "/public/README.md",
-      size_bytes: 100,
-      mime_type: "text/markdown",
-      is_public: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ],
-  "/Docs": [
-    {
-      id: "sim-file-plan",
-      name: "plan.txt",
-      is_directory: false,
-      path: "/Docs/plan.txt",
-      logical_path: "/Docs/plan.txt",
-      size_bytes: 200,
-      mime_type: "text/plain",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ],
-};
-// const recursivelyUpdatePathsAndMoveChildren_sim = (oldDirKey: string, newDirKey: string) => { /* ... simulation helper ... */ };
-
+// Connected API functions
 export const listFiles = async (
   path: string,
   isPublicContext: boolean = false
@@ -66,8 +11,10 @@ export const listFiles = async (
   if (requestPath !== "/") {
     params.path = requestPath;
   }
-  const endpoint = isPublicContext ? `/public-files/` : `/files/`;
-
+  const endpoint =
+    isPublicContext && requestPath.startsWith("/public")
+      ? `/files/`
+      : `/files/`;
   try {
     const response = await apiClient.get<FileNode[]>(endpoint, { params });
     return response.data.map((node) => ({
@@ -88,7 +35,6 @@ export const listFiles = async (
     throw apiError;
   }
 };
-
 export const listPublicFiles = async (
   path: string = "/"
 ): Promise<FileNode[]> => {
@@ -100,7 +46,6 @@ export const listPublicFiles = async (
   }
   return listFiles(effectivePath, true);
 };
-
 export const createFolder = async (
   folderName: string,
   parentNodeId: string | null
@@ -128,7 +73,6 @@ export const createFolder = async (
     throw apiError;
   }
 };
-
 export const uploadFile = async (
   file: File,
   parentNodeId: string | null
@@ -155,14 +99,10 @@ export const uploadFile = async (
     throw apiError;
   }
 };
-
 export const deleteNode = async (nodeId: string): Promise<void> => {
-  console.log(`[API] deleteNode: Deleting node with ID: ${nodeId}`);
   try {
     await apiClient.delete(`/files/${nodeId}/`);
-    console.log(`[API] deleteNode successful for ID: ${nodeId}`);
   } catch (error: any) {
-    console.error(`[API] deleteNode failed for ID ${nodeId}:`, error);
     const apiError: ApiError = {
       message:
         error.response?.data?.detail ||
@@ -174,89 +114,19 @@ export const deleteNode = async (nodeId: string): Promise<void> => {
     throw apiError;
   }
 };
-
-export const fetchNodeDetailsByPath = async (
-  logicalPath: string
-): Promise<FileNode> => {
-  console.log(`[SIMULATION] fetchNodeDetailsByPath for: ${logicalPath}`);
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      for (const key in mockFileSystem_for_simulations) {
-        const foundNode = mockFileSystem_for_simulations[key]?.find(
-          (node) => node.logical_path === logicalPath
-        );
-        if (foundNode) {
-          resolve(foundNode);
-          return;
-        }
-      }
-      if (mockFileSystem_for_simulations.hasOwnProperty(logicalPath)) {
-        const segments = logicalPath.split("/").filter(Boolean);
-        const name =
-          segments.pop() || (logicalPath === "/" ? "Root" : "Unknown");
-        const parentPath =
-          segments.length > 0
-            ? `/${segments.join("/")}`
-            : logicalPath === "/"
-            ? null
-            : "/";
-        let actualNode: FileNode | undefined;
-        if (parentPath && mockFileSystem_for_simulations[parentPath]) {
-          actualNode = mockFileSystem_for_simulations[parentPath]?.find(
-            (n) => n.logical_path === logicalPath
-          );
-        } else if (logicalPath === "/") {
-          reject({
-            message: "Cannot fetch details for root path '/' as a node.",
-            statusCode: 400,
-          });
-          return;
-        }
-        if (actualNode) {
-          resolve(actualNode);
-          return;
-        }
-      }
-      reject({
-        message: `Node details not found for path: ${logicalPath}`,
-        statusCode: 404,
-      });
-    }, 300);
-  });
-};
-
-/**
- * Renames a file or folder on the backend.
- * @param nodeId - The UUID of the FileSystemNode to rename.
- * @param newName - The new name for the item.
- * @returns A Promise resolving with the updated FileNode or rejecting with an ApiError.
- */
 export const renameNode = async (
   nodeId: string,
   newName: string
 ): Promise<FileNode> => {
-  console.log(
-    `[API] renameNode: Renaming node ID "${nodeId}" to new name "${newName}"`
-  );
-
   const formData = new FormData();
   formData.append("name", newName);
-
   try {
-    // Backend endpoint is PATCH /api/files/{node_id}/rename/
-    // Axios automatically sets Content-Type to multipart/form-data for FormData.
     const response = await apiClient.patch<FileNode>(
       `/files/${nodeId}/rename/`,
       formData
     );
-
-    console.log("[API] renameNode successful:", response.data);
-    return {
-      ...response.data,
-      path: response.data.logical_path, // Ensure frontend 'path' consistency
-    };
+    return { ...response.data, path: response.data.logical_path };
   } catch (error: any) {
-    console.error(`[API] renameNode failed for ID ${nodeId}:`, error);
     const apiError: ApiError = {
       message:
         error.response?.data?.name?.[0] ||
@@ -269,111 +139,86 @@ export const renameNode = async (
     throw apiError;
   }
 };
-
-// --- Remaining SIMULATED FUNCTIONS ---
-const MOCK_DELAY = 300;
-
-interface ShellCommandResult {
-  output: string | null;
-  error: string | null;
-  newPath?: string;
-}
-export const executeShellCommand = async (
-  commandLine: string,
-  currentPath: string
-): Promise<ShellCommandResult> => {
-  console.log(
-    `[SIMULATION] executeShellCommand: "${commandLine}" in path "${currentPath}"`
-  );
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const [command, ...args] = commandLine.trim().split(/\s+/);
-      let output: string | null = null;
-      let error: string | null = null;
-      let newPath: string | undefined = undefined;
-      const mockFS = mockFileSystem_for_simulations;
-      switch (command.toLowerCase()) {
-        case "ls":
-          const p = args[0] ? resolvePath(currentPath, args[0]) : currentPath;
-          if (mockFS[p])
-            output =
-              mockFS[p]
-                .map((i) => i.name + (i.is_directory ? "/" : ""))
-                .join("\n") || "(empty)";
-          else
-            error = `ls: cannot access '${
-              args[0] || p
-            }': No such file or directory`;
-          break;
-        case "cd":
-          if (!args[0]) {
-            error = "cd: missing operand";
-            break;
-          }
-          const np = resolvePath(currentPath, args[0]);
-          const tn = Object.values(mockFS)
-            .flat()
-            .find((n) => n.logical_path === np);
-          if (tn && tn.is_directory) newPath = np;
-          else if (tn && !tn.is_directory)
-            error = `cd: ${args[0]}: Not a directory`;
-          else error = `cd: ${args[0]}: No such file or directory`;
-          break;
-        case "pwd":
-          output = currentPath;
-          break;
-        case "mkdir":
-          if (!args[0]) {
-            error = "mkdir: missing operand";
-            break;
-          }
-          const dN = args[0];
-          if (!mockFS[currentPath]) {
-            error = `mkdir: cannot create directory '${dN}': Current path '${currentPath}' does not exist`;
-            break;
-          }
-          const dP = resolvePath(currentPath, dN);
-          if (mockFS[currentPath]?.some((n) => n.name === dN) || mockFS[dP]) {
-            error = `mkdir: cannot create directory '${dN}': File exists`;
-          } else {
-            const nF: FileNode = {
-              id: `sS${Date.now()}`,
-              name: dN,
-              is_directory: true,
-              path: dP,
-              logical_path: dP,
-              created_at: "",
-              updated_at: "",
-            };
-            mockFS[currentPath]?.push(nF);
-            mockFS[dP] = [];
-            output = `Directory '${dN}' created.`;
-          }
-          break;
-        case "help":
-          output =
-            "Available commands:\n  ls [path]       List directory contents\n  cd <directory>  Change directory\n  pwd             Print working directory\n  mkdir <name>    Create directory\n  clear           Clear the terminal\n  help            Show this help message";
-          break;
-        default:
-          error = `${command}: command not found`;
-      }
-      resolve({ output, error, newPath });
-    }, MOCK_DELAY);
-  });
+export const createShare = async (
+  nodeId: string,
+  sharedWithUserId: number,
+  permissionLevel: "view" | "edit"
+): Promise<SharePermission> => {
+  const requestBody = {
+    node: nodeId,
+    shared_with_user: sharedWithUserId,
+    permission_level: permissionLevel,
+  };
+  try {
+    const response = await apiClient.post<SharePermission>(
+      "/sharing/",
+      requestBody
+    );
+    return response.data;
+  } catch (error: any) {
+    const apiError: ApiError = {
+      message:
+        error.response?.data?.detail ||
+        error.response?.data?.non_field_errors?.[0] ||
+        error.message ||
+        "Failed to share item.",
+      statusCode: error.response?.status,
+      detail: error.response?.data,
+    };
+    throw apiError;
+  }
+};
+export const listSharedWithMe = async (): Promise<FileNode[]> => {
+  try {
+    const response = await apiClient.get<FileNode[]>(
+      "/sharing/shared-with-me/"
+    );
+    return response.data.map((node) => ({
+      ...node,
+      path: node.logical_path,
+      is_public:
+        node.is_public_root || node.logical_path.startsWith("/public/"),
+    }));
+  } catch (error: any) {
+    const apiError: ApiError = {
+      message:
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to fetch shared items.",
+      statusCode: error.response?.status,
+      detail: error.response?.data,
+    };
+    throw apiError;
+  }
 };
 
-const resolvePath = (current: string, target: string): string => {
-  if (target.startsWith("/")) {
-    if (target !== "/" && target.endsWith("/")) return target.slice(0, -1);
-    return target;
+/**
+ * Fetches details for a specific FileSystemNode by its logical path from the backend.
+ */
+export const fetchNodeDetailsByPath = async (
+  logicalPath: string
+): Promise<FileNode> => {
+  const requestPath = logicalPath || "/";
+  if (requestPath === "/") {
+    throw {
+      message: "Cannot get details for conceptual root '/' via this endpoint.",
+      statusCode: 400,
+    } as ApiError;
   }
-  const currentParts = current.split("/").filter((p) => p);
-  const targetParts = target.split("/").filter((p) => p);
-  for (const part of targetParts) {
-    if (part === "..") {
-      if (currentParts.length > 0) currentParts.pop();
-    } else if (part !== "." && part !== "") currentParts.push(part);
+  try {
+    const response = await apiClient.get<FileNode>(`/files/details-by-path/`, {
+      params: { path: requestPath },
+    });
+    return { ...response.data, path: response.data.logical_path };
+  } catch (error: any) {
+    const apiError: ApiError = {
+      message:
+        error.response?.data?.detail ||
+        error.message ||
+        `Failed to fetch details for path ${requestPath}.`,
+      statusCode: error.response?.status,
+      detail: error.response?.data,
+    };
+    throw apiError;
   }
-  const resolved = `/${currentParts.join("/")}`;
-  return resolved === "//" ? "/" : resolved || "/";
 };
