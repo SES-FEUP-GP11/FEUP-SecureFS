@@ -3,9 +3,9 @@ import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import type { ApiError, FileNode } from "../types";
 import {
   createFolder as createFolderService,
-  deleteNode as deleteNodeService, // This will be the API-connected version
+  deleteNode as deleteNodeService,
   listFiles,
-  renameNode as renameNodeService,
+  renameNode as renameNodeService, // This will be the API-connected version
   uploadFile as uploadFileService,
   fetchNodeDetailsByPath,
 } from "../services/fileService";
@@ -147,9 +147,17 @@ const FilesPage: React.FC = () => {
     }
   };
 
+  /**
+   * Handles renaming an item.
+   * Calls the renameNodeService with the item's ID and the new name.
+   */
   const handleRenameItem = async (item: FileNode, newName: string) => {
+    console.log(
+      `FilesPage: Attempting to rename item ID "${item.id}" (Name: "${item.name}") to "${newName}"`
+    );
     try {
-      await renameNodeService(item.logical_path, newName);
+      await renameNodeService(item.id, newName); // Pass item.id instead of item.logical_path
+      console.log(`FilesPage: Item renamed successfully. Refreshing list.`);
       setItemToRename(null);
       setIsRenameModalOpen(false);
       await fetchFiles();
@@ -159,16 +167,12 @@ const FilesPage: React.FC = () => {
     }
   };
 
-  /**
-   * Handles the deletion of a file or folder.
-   * Calls the deleteNodeService with the item's ID.
-   */
   const handleDeleteItem = async (item: FileNode) => {
     console.log(
       `FilesPage: Attempting to delete item ID: "${item.id}", Name: "${item.name}"`
     );
     try {
-      await deleteNodeService(item.id); // Pass the item's ID
+      await deleteNodeService(item.id);
       console.log(`FilesPage: Item deleted successfully. Refreshing list.`);
       setItemToDelete(null);
       setIsDeleteModalOpen(false);
