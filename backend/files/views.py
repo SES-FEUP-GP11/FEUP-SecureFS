@@ -300,7 +300,6 @@ class FileSystemNodeViewSet(viewsets.ModelViewSet):
                     "size_bytes",
                     "mime_type",
                     "is_directory",
-                    "is_public_root",
                     "created_at",
                     "deleted_at",
                 ]

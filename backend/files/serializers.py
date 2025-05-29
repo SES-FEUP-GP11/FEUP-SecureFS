@@ -20,7 +20,6 @@ class FileSystemNodeSerializer(serializers.ModelSerializer):
             "is_directory",
             "size_bytes",
             "mime_type",
-            "is_public_root",
             "created_at",
             "updated_at",
             "deleted_at",
