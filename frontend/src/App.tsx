@@ -6,31 +6,24 @@ import PrivateRoute from "./components/Common/PrivateRoute";
 import FilesPage from "./pages/FilesPage";
 import PublicFilesPage from "./pages/PublicFilesPage";
 import ShellPage from "./pages/ShellPage";
-import SharedWithMePage from "./pages/SharedWithMePage"; // Import the new page
+import MyPublicPage from "./pages/MyPublicPage"; // Ensure this is imported
+import SharedWithMePage from "./pages/SharedWithMePage"; // Assuming this exists
 
 export default function App() {
-  console.log("[App.tsx] Rendering App component");
-
   return (
     <BrowserRouter>
       <Routes>
-        {/* ---------- PUBLIC ---------- */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/public/*" element={<PublicFilesPage />} />
-
-        {/* ---------- PROTECTED ---------- */}
         <Route element={<PrivateRoute />}>
           <Route element={<MainLayout />}>
             <Route path="files/*" element={<FilesPage />} />
             <Route path="shell" element={<ShellPage />} />
-            <Route path="shared" element={<SharedWithMePage />} />{" "}
-            {/* ADDED SharedWithMePage Route */}
-            {/* Default route after login redirects to the base files path */}
+            <Route path="shared" element={<SharedWithMePage />} />
+            <Route path="my-public-page" element={<MyPublicPage />} />
             <Route index element={<Navigate to="/files" replace />} />
           </Route>
         </Route>
-
-        {/* ---------- FALLBACK ---------- */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
