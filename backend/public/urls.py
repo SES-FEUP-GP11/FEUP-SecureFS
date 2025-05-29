@@ -12,10 +12,5 @@ router.register(
 )
 
 urlpatterns = [
-    path(
-        "pages/<str:username>/<str:filename>/",
-        PublicPageServeView.as_view(),
-        name="public-page-serve",
-    ),
     path("", include(router.urls)),
 ]

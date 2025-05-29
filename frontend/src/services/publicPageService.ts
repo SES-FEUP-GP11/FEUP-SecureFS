@@ -1,7 +1,7 @@
 import type { PublicPageNode, ApiError } from "../types";
 import apiClient from "./apiClient";
 
-const BASE_PUBLIC_PAGES_API_URL = "/public-pages/manage/";
+const BASE_PUBLIC_PAGES_API_URL = "/public-pages/";
 
 export const listMyPublicPages = async (): Promise<PublicPageNode[]> => {
   try {
@@ -60,49 +60,6 @@ export const deletePublicPage = async (pageId: string): Promise<void> => {
         error.response?.data?.detail ||
         error.message ||
         "Failed to delete public page.",
-      statusCode: error.response?.status,
-      detail: error.response?.data,
-    };
-    throw apiError;
-  }
-};
-
-export const getPublicPageContent = async (pageId: string): Promise<string> => {
-  console.log(
-    `[API] getPublicPageContent: Fetching content for page ID: ${pageId}`
-  );
-  try {
-    const response = await apiClient.get<string>(
-      `${BASE_PUBLIC_PAGES_API_URL}${pageId}/content/`,
-      {
-        headers: { Accept: "text/html, text/plain, */*" },
-      }
-    );
-    console.log(`[API] getPublicPageContent successful for ID: ${pageId}.`);
-    return response.data;
-  } catch (error: any) {
-    console.error(`[API] getPublicPageContent failed for ID ${pageId}:`, error);
-    let errorMessage = "Failed to fetch public page content.";
-    if (error.response?.data) {
-      if (
-        typeof error.response.data === "object" &&
-        error.response.data !== null
-      ) {
-        errorMessage =
-          error.response.data.detail ||
-          error.response.data.message ||
-          errorMessage;
-      } else if (
-        typeof error.response.data === "string" &&
-        error.response.data.length < 200
-      ) {
-        errorMessage = error.response.data;
-      }
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-    const apiError: ApiError = {
-      message: errorMessage,
       statusCode: error.response?.status,
       detail: error.response?.data,
     };

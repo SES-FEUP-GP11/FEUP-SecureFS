@@ -32,6 +32,7 @@ const MyPublicPage: React.FC = () => {
   const [publicPages, setPublicPages] = useState<PublicPageNode[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<ApiError | null>(null);
+
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<PublicPageNode | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -39,11 +40,12 @@ const MyPublicPage: React.FC = () => {
     id: string;
     timer: number | null;
   }>({ id: "", timer: null });
+
   const { user } = useAuth();
   const navigate = useNavigate();
   const publicPageUserIdentifier =
+    user?.username ||
     user?.email?.split("@")[0] ||
-    user?.first_name?.toLowerCase() ||
     user?.id.toString() ||
     "user";
 
@@ -90,11 +92,9 @@ const MyPublicPage: React.FC = () => {
     setItemToDelete(page);
     setIsDeleteModalOpen(true);
   };
+
   const handleCopyLink = (page: PublicPageNode) => {
-    const filenameBase = page.name.toLowerCase().endsWith(".html")
-      ? page.name.slice(0, -5)
-      : page.name;
-    const urlToCopy = `${PUBLIC_PAGE_VIEW_BASE_URL}/published/${publicPageUserIdentifier}/${filenameBase}`;
+    const urlToCopy = `${PUBLIC_PAGE_VIEW_BASE_URL}/published/${publicPageUserIdentifier}/${page.name}`;
     navigator.clipboard
       .writeText(urlToCopy)
       .then(() => {
@@ -107,16 +107,23 @@ const MyPublicPage: React.FC = () => {
       })
       .catch((err) => console.error("Failed to copy public URL:", err));
   };
-  const handlePreviewInternal = (pageId: string) => {
-    navigate(`/preview-public-page/${pageId}`);
+
+  const handlePreviewInternal = (page: PublicPageNode) => {
+    const fullPublicUrl = `${PUBLIC_PAGE_VIEW_BASE_URL}/published/${publicPageUserIdentifier}/${page.name}`;
+    navigate(`/preview-public-page`, {
+      state: {
+        publicUrlToFetch: fullPublicUrl,
+        pageName: page.name,
+      },
+    });
   };
 
-  // Correctly placed loading and error handling for the component's main return
+  // This is the correct placement for loading and error state rendering
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-        <span className="ml-2 text-gray-600">Loading public files...</span>
+        <span className="ml-2 text-gray-600">Loading your public pages...</span>
       </div>
     );
   }
@@ -126,7 +133,7 @@ const MyPublicPage: React.FC = () => {
         className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative flex items-center"
         role="alert"
       >
-        <AlertCircle className="h-5 w-5 mr-2" />
+        <AlertTriangle className="h-5 w-5 mr-2" />
         <strong className="font-bold mr-1">Error:</strong>
         <span className="block sm:inline">
           {error.message || "Could not load your public pages."}
@@ -156,10 +163,11 @@ const MyPublicPage: React.FC = () => {
         accessible page. Your public pages are available at a base URL like:{" "}
         <code className="text-xs bg-gray-100 p-1 rounded mx-1 break-all">
           {PUBLIC_PAGE_VIEW_BASE_URL}/published/{publicPageUserIdentifier}
-          /[your-filename-without-html-ext]
+          /[your-filename.html]
         </code>
       </p>
 
+      {/* Corrected placement for empty state check */}
       {!isLoading && !error && publicPages.length === 0 && (
         <div className="text-center py-10 border-2 border-dashed border-gray-300 rounded-lg">
           <FileText className="mx-auto h-12 w-12 text-gray-400" />
@@ -175,10 +183,7 @@ const MyPublicPage: React.FC = () => {
       {!isLoading && !error && publicPages.length > 0 && (
         <div className="space-y-3">
           {publicPages.map((page) => {
-            const filenameBase = page.name.toLowerCase().endsWith(".html")
-              ? page.name.slice(0, -5)
-              : page.name;
-            const fullPublicUrl = `${PUBLIC_PAGE_VIEW_BASE_URL}/published/${publicPageUserIdentifier}/${filenameBase}`;
+            const fullPublicUrl = `${PUBLIC_PAGE_VIEW_BASE_URL}/published/${publicPageUserIdentifier}/${page.name}`;
             return (
               <div
                 key={page.id}
@@ -210,7 +215,7 @@ const MyPublicPage: React.FC = () => {
                 <div className="flex items-center space-x-1 shrink-0 ml-4">
                   <button
                     title="Preview Sandboxed"
-                    onClick={() => handlePreviewInternal(page.id)}
+                    onClick={() => handlePreviewInternal(page)}
                     className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
                   >
                     {" "}
@@ -275,4 +280,5 @@ const MyPublicPage: React.FC = () => {
   );
 };
 
+// The "Helper JSX for brevity" block that was here previously has been removed.
 export default MyPublicPage;

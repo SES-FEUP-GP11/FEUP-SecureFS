@@ -3,7 +3,8 @@ export interface User {
   email: string;
   first_name?: string | null;
   last_name?: string | null;
-  // This might be where a 'public_username_slug' could be added if different from email prefix
+  // If your backend uses User.username for the public URL, ensure it's available here
+  username?: string;
 }
 
 /**
@@ -26,16 +27,12 @@ export interface FileNode {
 
 /**
  * Represents a user's publicly published HTML page.
- * Aligns with backend PublicPage model and API responses.
  */
 export interface PublicPageNode {
-  id: string; // UUID of the PublicPage record
-  name: string; // User-facing filename from backend, e.g., "index.html", "about.html"
-  // public_url is constructed on the frontend based on convention or a field from backend
+  id: string;
+  name: string; // Filename from backend, e.g., "index.html", "about.html"
   created_at: string;
   updated_at: string;
-  // The backend GET list response for public pages might not include owner details
-  // as it's scoped to the authenticated user.
 }
 
 /**

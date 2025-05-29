@@ -1,45 +1,29 @@
-// src/components/Common/PrivateRoute.tsx
 import React from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, useLocation, Outlet } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 
 const PrivateRoute: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isAuthenticating } = useAuth();
   const location = useLocation();
 
-  // ---------- DEBUG LOGS ----------
-  console.log("[PrivateRoute] Status Check:", {
-    isLoading,
-    isAuthenticated,
-    path: location.pathname,
-  });
-  // ---------------------------------
+  // console.log("[PrivateRoute] Status Check:", { isLoading, isAuthenticating, isAuthenticated, path: location.pathname });
 
-  /* 1. While we’re still checking the token, show a splash */
-  if (isLoading) {
-    console.log("[PrivateRoute] Rendering Loading Indicator");
+  if (isLoading || isAuthenticating) {
+    // console.log("[PrivateRoute] Rendering Loading Indicator (isLoading or isAuthenticating)");
     return (
-      <div className="flex justify-center items-center h-screen">
-        <p>Checking session…</p>
+      <div className="fixed inset-0 bg-gray-100 flex flex-col justify-center items-center text-gray-700 z-[100]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <p className="mt-3 text-lg">Checking session...</p>
       </div>
     );
   }
 
-  /* 2. If the user isn’t logged in, bounce them to /login */
   if (!isAuthenticated) {
-    console.log(
-      "[PrivateRoute] Redirecting to Login from path:",
-      location.pathname
-    );
+    // console.log("[PrivateRoute] Not authenticated, redirecting to Login from path:", location.pathname);
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  /* 3. User is authenticated → render the branch below this route */
-  console.log(
-    "[PrivateRoute] Authenticated, rendering outlet for path:",
-    location.pathname
-  );
+  // console.log("[PrivateRoute] Authenticated, rendering outlet for path:", location.pathname);
   return <Outlet />;
 };
-
 export default PrivateRoute;
