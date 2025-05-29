@@ -3,7 +3,7 @@ import os
 import magic
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
-from django.http import FileResponse
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.views import View
 from rest_framework import status, viewsets
@@ -158,7 +158,7 @@ class PublicPageServeView(View):
         file_path = os.path.join(user_dir, disk_name)
 
         if not os.path.isfile(file_path):
-            raise Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
+            raise Http404("Public page not found")
 
         response = FileResponse(open(file_path, "rb"), content_type="text/html")
 
