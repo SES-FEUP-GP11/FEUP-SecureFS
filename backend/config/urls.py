@@ -9,4 +9,6 @@ urlpatterns = [
     path("api/files/", include("files.urls")),
     # Sharing
     path("api/sharing/", include("sharing.urls")),
+    # Public pages
+    path("api/public-pages/", include("public.urls")),
 ]
