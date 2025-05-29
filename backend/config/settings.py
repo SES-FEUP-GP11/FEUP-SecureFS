@@ -5,6 +5,7 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECURE_USER_FILES_STORAGE_BASE = os.path.join(BASE_DIR, "..", "user_files_storage")
+PUBLIC_PAGES_STORAGE_BASE = os.path.join(BASE_DIR, "..", "public_pages_storage")
 
 if not os.path.exists(SECURE_USER_FILES_STORAGE_BASE):
     os.makedirs(SECURE_USER_FILES_STORAGE_BASE, exist_ok=True)
@@ -40,6 +41,7 @@ INSTALLED_APPS = [
     "authentication",
     "files",
     "sharing",
+    "public",
     "corsheaders",
 ]
 

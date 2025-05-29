@@ -25,9 +25,6 @@ class FileSystemNode(models.Model):
     size_bytes = models.BigIntegerField(null=True)
     mime_type = models.CharField(max_length=100, null=True)
 
-    # public-page helper
-    is_public_root = models.BooleanField(default=False)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
