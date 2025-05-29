@@ -3,6 +3,9 @@ import os
 import magic
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
+from django.views import View
 from rest_framework import status, viewsets
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -137,3 +140,32 @@ class PublicPageViewSet(viewsets.ModelViewSet):
         page.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PublicPageServeView(View):
+    """
+    Serve a user's public HTML page at URL like:
+      GET /pages/{username}/{filename}
+    """
+
+    def get(self, request, username, filename):
+
+        page = get_object_or_404(PublicPage, owner__username=username, name=filename)
+
+        user_dir = os.path.join(settings.PUBLIC_PAGES_STORAGE_BASE, str(page.owner_id))
+
+        disk_name = f"{page.physical_storage_filename}.html"
+        file_path = os.path.join(user_dir, disk_name)
+
+        if not os.path.isfile(file_path):
+            raise Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        response = FileResponse(open(file_path, "rb"), content_type="text/html")
+
+        # Security hardening headers
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Content-Security-Policy"] = "default-src 'self';"
+        response["Cache-Control"] = "public, max-age=3600"
+        response["X-Frame-Options"] = "DENY"
+
+        return response
