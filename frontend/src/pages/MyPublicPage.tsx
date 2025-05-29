@@ -9,35 +9,43 @@ import {
   Globe,
   UploadCloud as UploadIcon,
   FileText,
-  AlertCircle,
+  AlertTriangle,
   Loader2,
-  MoreVertical,
-  Edit3,
   Trash2,
   Eye,
   Copy as CopyIcon,
   Check,
+  ExternalLink,
 } from "lucide-react";
 import UploadPublicHTMLModal from "../components/public_pages/UploadPublicHTMLModal";
 import ConfirmDeleteModal from "../components/files/ConfirmDeleteModal";
-import { useAuth } from "../hooks/useAuth"; // Import useAuth
+import { useAuth } from "../hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+
+const PUBLIC_PAGE_VIEW_BASE_URL =
+  import.meta.env.VITE_PUBLIC_PAGES_DOMAIN ||
+  (import.meta.env.DEV
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
+    : "");
 
 const MyPublicPage: React.FC = () => {
   const [publicPages, setPublicPages] = useState<PublicPageNode[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<ApiError | null>(null);
-
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<PublicPageNode | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [activeContextMenu, setActiveContextMenu] = useState<string | null>(
-    null
-  );
-  const [copiedLink, setCopiedLink] = useState<string | null>(null);
-
+  const [copiedLinkInfo, setCopiedLinkInfo] = useState<{
+    id: string;
+    timer: number | null;
+  }>({ id: "", timer: null });
   const { user } = useAuth();
-  const publicPageUsername =
-    user?.email?.split("@")[0] || user?.first_name || "user";
+  const navigate = useNavigate();
+  const publicPageUserIdentifier =
+    user?.email?.split("@")[0] ||
+    user?.first_name?.toLowerCase() ||
+    user?.id.toString() ||
+    "user";
 
   const fetchMyPublicPages = useCallback(async () => {
     setIsLoading(true);
@@ -61,52 +69,49 @@ const MyPublicPage: React.FC = () => {
       await uploadPublicHTMLFile(filename, htmlFile);
       await fetchMyPublicPages();
     } catch (err) {
-      console.error(
-        `MyPublicPage: Failed to upload HTML file "${filename}"`,
-        err
-      );
+      console.error(`MyPublicPage: Failed to upload HTML file`, err);
       throw err;
     }
   };
-
   const handleDeletePublicPage = async (page: PublicPageNode) => {
+    if (!page) return;
     try {
       await deletePublicPage(page.id);
       await fetchMyPublicPages();
     } catch (err) {
       console.error(`MyPublicPage: Failed to delete page`, err);
-      throw err;
+      const apiError = err as ApiError;
+      throw {
+        message: apiError.message || "Failed to delete page.",
+      } as ApiError;
     }
   };
-
   const openDeleteModal = (page: PublicPageNode) => {
     setItemToDelete(page);
     setIsDeleteModalOpen(true);
-    setActiveContextMenu(null);
   };
-  const toggleContextMenu = (pageId: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    setActiveContextMenu((prev) => (prev === pageId ? null : pageId));
-  };
-
-  useEffect(() => {
-    const handleClickOutside = () => setActiveContextMenu(null);
-    if (activeContextMenu)
-      document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, [activeContextMenu]);
-
-  const handleCopyLink = (url: string) => {
+  const handleCopyLink = (page: PublicPageNode) => {
+    const filenameBase = page.name.toLowerCase().endsWith(".html")
+      ? page.name.slice(0, -5)
+      : page.name;
+    const urlToCopy = `${PUBLIC_PAGE_VIEW_BASE_URL}/published/${publicPageUserIdentifier}/${filenameBase}`;
     navigator.clipboard
-      .writeText(url)
+      .writeText(urlToCopy)
       .then(() => {
-        setCopiedLink(url);
-        setTimeout(() => setCopiedLink(null), 2000);
+        if (copiedLinkInfo.timer) clearTimeout(copiedLinkInfo.timer);
+        const timerId = window.setTimeout(
+          () => setCopiedLinkInfo({ id: "", timer: null }),
+          2000
+        );
+        setCopiedLinkInfo({ id: page.id, timer: timerId });
       })
       .catch((err) => console.error("Failed to copy public URL:", err));
   };
+  const handlePreviewInternal = (pageId: string) => {
+    navigate(`/preview-public-page/${pageId}`);
+  };
 
-  // This is the correct placement for loading and error state rendering
+  // Correctly placed loading and error handling for the component's main return
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -143,21 +148,18 @@ const MyPublicPage: React.FC = () => {
           onClick={() => setIsUploadModalOpen(true)}
           className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
         >
-          <UploadIcon size={18} className="mr-2" />
-          Upload New HTML Page
+          <UploadIcon size={18} className="mr-2" /> Upload New HTML Page
         </button>
       </div>
       <p className="text-sm text-gray-600 mb-4">
         Manage HTML files for your public presence. Each file creates a publicly
-        accessible page. Your public pages are available at a base URL like:
+        accessible page. Your public pages are available at a base URL like:{" "}
         <code className="text-xs bg-gray-100 p-1 rounded mx-1 break-all">
-          [https://pages.yoursecurefs.com/](https://pages.yoursecurefs.com/)
-          {publicPageUsername}/[your-filename-without-html]
+          {PUBLIC_PAGE_VIEW_BASE_URL}/published/{publicPageUserIdentifier}
+          /[your-filename-without-html-ext]
         </code>
       </p>
 
-      {/* This loading/error check is for after initial load, if list is empty */}
-      {/* The main isLoading/error for initial empty state is handled above the return */}
       {!isLoading && !error && publicPages.length === 0 && (
         <div className="text-center py-10 border-2 border-dashed border-gray-300 rounded-lg">
           <FileText className="mx-auto h-12 w-12 text-gray-400" />
@@ -165,7 +167,7 @@ const MyPublicPage: React.FC = () => {
             You haven't published any HTML pages yet.
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            Upload an `index.html` or other HTML files to get started!
+            Upload an HTML file to get started!
           </p>
         </div>
       )}
@@ -173,13 +175,10 @@ const MyPublicPage: React.FC = () => {
       {!isLoading && !error && publicPages.length > 0 && (
         <div className="space-y-3">
           {publicPages.map((page) => {
-            const fullPublicUrl = `${
-              window.location.protocol
-            }//pages.yoursecurefs.com/${publicPageUsername}/${page.filename.replace(
-              /\.html$/i,
-              ""
-            )}`;
-
+            const filenameBase = page.name.toLowerCase().endsWith(".html")
+              ? page.name.slice(0, -5)
+              : page.name;
+            const fullPublicUrl = `${PUBLIC_PAGE_VIEW_BASE_URL}/published/${publicPageUserIdentifier}/${filenameBase}`;
             return (
               <div
                 key={page.id}
@@ -190,9 +189,9 @@ const MyPublicPage: React.FC = () => {
                   <div className="min-w-0">
                     <p
                       className="text-indigo-700 font-semibold text-md truncate"
-                      title={page.filename}
+                      title={page.name}
                     >
-                      {page.filename}
+                      {page.name}
                     </p>
                     <p className="text-xs text-gray-500">
                       Last updated:{" "}
@@ -202,26 +201,35 @@ const MyPublicPage: React.FC = () => {
                       href={fullPublicUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-blue-500 hover:underline break-all"
+                      className="text-xs text-blue-500 hover:underline break-all block"
                     >
                       {fullPublicUrl}
                     </a>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2 shrink-0 ml-4">
+                <div className="flex items-center space-x-1 shrink-0 ml-4">
                   <button
-                    title="Preview Public Page"
-                    onClick={() => window.open(fullPublicUrl, "_blank")}
+                    title="Preview Sandboxed"
+                    onClick={() => handlePreviewInternal(page.id)}
                     className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
                   >
-                    <Eye size={18} />
+                    {" "}
+                    <Eye size={18} />{" "}
+                  </button>
+                  <button
+                    title="Open Public Link"
+                    onClick={() => window.open(fullPublicUrl, "_blank")}
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+                  >
+                    {" "}
+                    <ExternalLink size={18} />{" "}
                   </button>
                   <button
                     title="Copy Public Link"
-                    onClick={() => handleCopyLink(fullPublicUrl)}
+                    onClick={() => handleCopyLink(page)}
                     className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-md"
                   >
-                    {copiedLink === fullPublicUrl ? (
+                    {copiedLinkInfo.id === page.id ? (
                       <Check size={18} className="text-green-600" />
                     ) : (
                       <CopyIcon size={18} />
@@ -232,7 +240,8 @@ const MyPublicPage: React.FC = () => {
                     onClick={() => openDeleteModal(page)}
                     className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md"
                   >
-                    <Trash2 size={18} />
+                    {" "}
+                    <Trash2 size={18} />{" "}
                   </button>
                 </div>
               </div>
@@ -240,7 +249,6 @@ const MyPublicPage: React.FC = () => {
           })}
         </div>
       )}
-
       <UploadPublicHTMLModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
@@ -256,11 +264,11 @@ const MyPublicPage: React.FC = () => {
           onConfirmDelete={() => handleDeletePublicPage(itemToDelete)}
           itemToDelete={{
             ...itemToDelete,
-            name: itemToDelete.filename,
+            name: itemToDelete.name,
             is_directory: false,
-            logical_path: itemToDelete.public_url,
-            path: itemToDelete.public_url,
-          }} // Adapt for ConfirmDeleteModal
+            logical_path: "",
+            path: "",
+          }}
         />
       )}
     </div>

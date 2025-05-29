@@ -1,13 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
 import LoginPage from "./pages/LoginPage";
 import MainLayout from "./layouts/MainLayout";
 import PrivateRoute from "./components/Common/PrivateRoute";
 import FilesPage from "./pages/FilesPage";
 import PublicFilesPage from "./pages/PublicFilesPage";
 import ShellPage from "./pages/ShellPage";
-import MyPublicPage from "./pages/MyPublicPage"; // Ensure this is imported
-import SharedWithMePage from "./pages/SharedWithMePage"; // Assuming this exists
+import MyPublicPage from "./pages/MyPublicPage";
+import SharedWithMePage from "./pages/SharedWithMePage";
+import PublicPagePreview from "./pages/PublicPagePreview";
 
 export default function App() {
   return (
@@ -23,6 +23,10 @@ export default function App() {
             <Route path="my-public-page" element={<MyPublicPage />} />
             <Route index element={<Navigate to="/files" replace />} />
           </Route>
+          <Route
+            path="/preview-public-page/:pageId"
+            element={<PublicPagePreview />}
+          />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

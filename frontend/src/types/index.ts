@@ -3,6 +3,7 @@ export interface User {
   email: string;
   first_name?: string | null;
   last_name?: string | null;
+  // This might be where a 'public_username_slug' could be added if different from email prefix
 }
 
 /**
@@ -13,46 +14,47 @@ export interface FileNode {
   name: string;
   is_directory: boolean;
   logical_path: string;
-  path: string; 
+  path: string;
   size_bytes?: number | null;
   mime_type?: string | null;
   is_public_root?: boolean;
   created_at: string;
   updated_at: string;
-  owner_username?: string; 
+  owner_username?: string;
   is_public?: boolean;
 }
 
 /**
  * Represents a user's publicly published HTML page.
- * Aligns with backend PublicPageSerializer.
+ * Aligns with backend PublicPage model and API responses.
  */
 export interface PublicPageNode {
   id: string; // UUID of the PublicPage record
-  filename: string; // User-facing filename, e.g., "index.html", "about.html"
-  public_url: string; // Full public URL, e.g., "/published/username/index"
+  name: string; // User-facing filename from backend, e.g., "index.html", "about.html"
+  // public_url is constructed on the frontend based on convention or a field from backend
   created_at: string;
   updated_at: string;
-  // owner field is usually not needed on the frontend list for "My" public pages
+  // The backend GET list response for public pages might not include owner details
+  // as it's scoped to the authenticated user.
 }
 
 /**
  * Represents sharing permission.
  */
 export interface SharePermission {
-  id: string;              
-  node: string;            
-  shared_with_user: number; 
+  id: string;
+  node: string;
+  shared_with_user: number;
   permission_level: "view" | "edit";
   created_at: string;
-  updated_at?: string; 
+  updated_at?: string;
 }
 
 /**
  * Standard structure for API error responses.
  */
 export interface ApiError {
-  message: string; 
-  detail?: string | Record<string, any>; 
+  message: string;
+  detail?: string | Record<string, any>;
   statusCode?: number;
 }
